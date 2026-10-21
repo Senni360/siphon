@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Siphon · Settings</title>
+  <link rel="icon" href="../../icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../shared/ui/tokens.css">
+  <link rel="stylesheet" href="options.css">
+  <link rel="stylesheet" href="../shared/ui/music.css">
+  <script type="module" src="options.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to settings</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Siphon settings">
+      <a class="brand" href="#general"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4v8a6 6 0 0 0 12 0V4"/><path d="M10 4v8a2 2 0 0 0 4 0V4"/></svg><span>Siphon<small>Your audio, locally.</small></span></a>
+      <nav aria-label="Settings sections">
+        <a href="#general"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8M16 5v4M10 15v4"/></svg>General</a>
+        <a href="#audio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 11v2"/></svg>Audio</a>
+        <a href="#analysis"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l10-2v12M9 18a2.5 2.5 0 1 1-2.5-2.5A2.5 2.5 0 0 1 9 18Zm10-2a2.5 2.5 0 1 1-2.5-2.5A2.5 2.5 0 0 1 19 16Z"/></svg>Tempo &amp; key</a>
+        <a href="#sites"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4ZM4 9h16M8 5v4"/></svg>Sites & playlists</a>
+        <a href="#advanced"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM12 3v2M12 19v2M4.2 7.5l1.7 1M18.1 15.5l1.7 1M4.2 16.5l1.7-1M18.1 8.5l1.7-1"/></svg>Advanced</a>
+        <div class="nav-divider"></div>
+        <a href="#history"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4M12 8v4l3 2"/></svg>History</a>
+        <a href="#setup"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0ZM12 16v5"/></svg>Connection & setup</a>
+        <a href="#about"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 11v5M12 8h.01"/></svg>About</a>
+      </nav>
+      <a class="host-card" href="#setup"><span class="status-dot" id="host-dot"></span><span id="host-label">Connecting to host…</span></a>
+      <div class="sidebar-foot">Made for Helium <span id="rail-version"></span></div>
+    </aside>
+    <main id="main" tabindex="-1">
+      <div class="topline"><span id="save-status" role="status" aria-live="polite">Loading…</span></div>
+      <div id="notice" role="alert" hidden></div>
+      <header class="page-heading"><h1 id="page-title">General</h1><p id="page-description">Make Siphon fit the way you collect audio.</p></header>
+      <div id="content" aria-busy="true"><p class="muted">Loading your preferences…</p></div>
+      <footer class="page-foot">Audio goes to your computer. Preferences save automatically.</footer>
+    </main>
+  </div>
+</body>
+</html>

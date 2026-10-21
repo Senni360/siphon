@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Siphon — Audio Downloader",
+  "short_name": "Siphon",
+  "version": "1.0.0",
+  "description": "Download audio from YouTube, SoundCloud, Bandcamp and 1000+ sites instantly.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2oTPGpOy9BlQsLAprJOAdSlJrheqN9To10dLn87PlBxTDy1LmNeSJLiUG/L7ds2iAE2ZrwTCA2Ut0aFCwgfN9M+cpD8BHeBCgpT+pVGUAF2gQUjsyMN6P6mcaL57ueftBb+15S+2Y1gVu95geB7N5un2NP2BYbfliH6oApCPKUrSqz0n751K/SEdwvJC3t9BpOH2wzpMFdqDm6MyA6TwYkpDGJquTHwKcj81NI/7s/gsTKvhlrVDINb/FIIMA59OcAzZ6Ult77JSE/7z3E8ijreWdudQnV5BXJpHvfardYb8H9O9kq4eGtSkEyEcHe8wRSVzYCIi+ckrS2bqtUH2fwIDAQAB",
+  "minimum_chrome_version": "120",
+  "permissions": ["nativeMessaging", "storage", "contextMenus", "notifications", "activeTab", "tabs", "scripting", "cookies", "downloads", "alarms"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "src/background/service-worker.js", "type": "module" },
+  "action": { "default_popup": "src/popup/popup.html", "default_title": "Siphon — download audio" },
+  "options_page": "src/options/options.html",
+  "icons": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
+  "commands": {
+    "_execute_action": { "suggested_key": { "default": "Alt+Shift+S" }, "description": "Open Siphon" },
+    "download-current": { "suggested_key": { "default": "Alt+Shift+D" }, "description": "Download audio from the current tab instantly" }
+  },
+  "content_scripts": [
+    { "matches": ["https://www.youtube.com/*"], "js": ["src/content/media.js", "src/content/core.js", "src/content/youtube.js"], "run_at": "document_idle" },
+    { "matches": ["https://music.youtube.com/*"], "js": ["src/content/media.js", "src/content/core.js", "src/content/youtube-music.js"], "run_at": "document_idle" },
+    { "matches": ["https://soundcloud.com/*", "https://www.soundcloud.com/*"], "js": ["src/content/media.js", "src/content/core.js", "src/content/soundcloud.js"], "run_at": "document_idle" },
+    { "matches": ["https://*.bandcamp.com/*"], "js": ["src/content/media.js", "src/content/core.js", "src/content/bandcamp.js"], "run_at": "document_idle" }
+  ],
+  "web_accessible_resources": [
+    { "resources": ["fonts/Geist-Variable.woff2", "fonts/GeistMono-Variable.woff2"], "matches": ["https://www.youtube.com/*", "https://music.youtube.com/*", "https://soundcloud.com/*", "https://www.soundcloud.com/*", "https://*.bandcamp.com/*"] }
+  ]
+}

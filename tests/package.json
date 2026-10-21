@@ -1,0 +1,14 @@
+{
+  "name": "siphon-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "host": "node e2e/host-protocol.mjs",
+    "host:live": "node e2e/host-protocol.mjs --live",
+    "extension": "node e2e/extension.mjs",
+    "sites": "node e2e/site-ui.mjs",
+    "static": "node --experimental-vm-modules e2e/static.mjs",
+    "test": "node --test e2e/harness.test.mjs"
+  },
+  "devDependencies": { "playwright": "^1.60.0" }
+}

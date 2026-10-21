@@ -1,0 +1,93 @@
+/* Shared Siphon UI contract: neutral frosted glass, colour only from the service.
+   Set data-theme="light|dark" on <html>; system is automatic.
+   Set data-service="youtube|youtubeMusic|soundcloud|bandcamp" on any element to tint it. */
+@font-face { font-family: "Geist"; src: url("../../../fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("../../../fonts/GeistMono-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+
+:root {
+  color-scheme: dark;
+  --ground: #0a0a0c;
+  --ground-lift: #141418;
+  --pane: rgb(255 255 255 / .045);
+  --pane-strong: rgb(255 255 255 / .08);
+  --pane-press: rgb(255 255 255 / .12);
+  --hair: rgb(255 255 255 / .08);
+  --hair-strong: rgb(255 255 255 / .15);
+  --specular: inset 0 1px 0 rgb(255 255 255 / .07);
+  --lift: 0 1px 2px rgb(0 0 0 / .35), 0 12px 32px -14px rgb(0 0 0 / .7);
+  --text: #f4f4f5; --text-2: #a1a1aa; --text-3: #92929c;
+  --danger: #ff7b72; --danger-soft: rgb(255 123 114 / .1);
+  --warning: #e8c37a;
+  /* Service accent: neutral unless an ancestor names a service. */
+  --svc: #f4f4f5; --svc-ink: #f4f4f5; --svc-fill: #f4f4f5; --svc-on: #0a0a0c; --svc-soft: rgb(255 255 255 / .1);
+  --font-sans: "Geist", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Geist Mono", "Cascadia Mono", Consolas, monospace;
+  --radius-sm: 8px; --radius: 14px; --radius-lg: 20px; --radius-pill: 999px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px;
+  --motion-fast: 140ms; --motion: 260ms; --ease-out: cubic-bezier(.16, 1, .3, 1); --ease-spring: cubic-bezier(.34, 1.4, .5, 1);
+  /* Legacy names consumed by older styles. */
+  --bg: var(--ground); --surface: var(--pane); --surface-raised: var(--pane-strong);
+  --muted: var(--text-2); --border: var(--hair);
+  --accent: var(--svc-ink); --accent-hover: var(--text); --accent-ink: var(--svc-on); --accent-soft: var(--svc-soft);
+  --focus: var(--svc-ink);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --ground: #f2f2f4; --ground-lift: #ffffff;
+    --pane: rgb(255 255 255 / .7); --pane-strong: rgb(255 255 255 / .95); --pane-press: rgb(0 0 0 / .05);
+    --hair: rgb(0 0 0 / .08); --hair-strong: rgb(0 0 0 / .14);
+    --specular: inset 0 1px 0 rgb(255 255 255 / .9);
+    --lift: 0 1px 2px rgb(20 20 30 / .06), 0 12px 32px -16px rgb(20 20 30 / .25);
+    --text: #111113; --text-2: #5c5c66; --text-3: #6b6b75;
+    --danger: #c42b1c; --danger-soft: rgb(196 43 28 / .08); --warning: #8a5a00;
+    --svc: #111113; --svc-ink: #111113; --svc-fill: #111113; --svc-on: #ffffff; --svc-soft: rgb(0 0 0 / .06);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --ground: #f2f2f4; --ground-lift: #ffffff;
+  --pane: rgb(255 255 255 / .7); --pane-strong: rgb(255 255 255 / .95); --pane-press: rgb(0 0 0 / .05);
+  --hair: rgb(0 0 0 / .08); --hair-strong: rgb(0 0 0 / .14);
+  --specular: inset 0 1px 0 rgb(255 255 255 / .9);
+  --lift: 0 1px 2px rgb(20 20 30 / .06), 0 12px 32px -16px rgb(20 20 30 / .25);
+  --text: #111113; --text-2: #5c5c66; --text-3: #6b6b75;
+  --danger: #c42b1c; --danger-soft: rgb(196 43 28 / .08); --warning: #8a5a00;
+  --svc: #111113; --svc-ink: #111113; --svc-fill: #111113; --svc-on: #ffffff; --svc-soft: rgb(0 0 0 / .06);
+}
+
+/* Service accents. --svc-ink is text-safe on the ground (≥4.5:1); --svc-fill/--svc-on is the filled button pair. */
+[data-service="other"] { --svc: #f4f4f5; --svc-ink: #f4f4f5; --svc-fill: #f4f4f5; --svc-on: #0a0a0c; --svc-soft: rgb(255 255 255 / .1); }
+:root[data-service="youtube"], :root[data-service="youtubeMusic"], [data-service="youtube"], [data-service="youtubeMusic"] { --svc: #ff0033; --svc-ink: #ff4d6a; --svc-fill: #e5002d; --svc-on: #ffffff; --svc-soft: rgb(255 0 51 / .14); }
+:root[data-service="soundcloud"], [data-service="soundcloud"] { --svc: #ff5500; --svc-ink: #ff7a33; --svc-fill: #ff5500; --svc-on: #150700; --svc-soft: rgb(255 85 0 / .14); }
+:root[data-service="bandcamp"], [data-service="bandcamp"] { --svc: #1da0c3; --svc-ink: #4cc3e0; --svc-fill: #1da0c3; --svc-on: #03141a; --svc-soft: rgb(29 160 195 / .15); }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) [data-service="other"] { --svc: #111113; --svc-ink: #111113; --svc-fill: #111113; --svc-on: #ffffff; --svc-soft: rgb(0 0 0 / .06); }
+  :root:not([data-theme="dark"]) [data-service="youtube"], :root:not([data-theme="dark"]) [data-service="youtubeMusic"],
+  :root:not([data-theme="dark"])[data-service="youtube"], :root:not([data-theme="dark"])[data-service="youtubeMusic"] { --svc-ink: #cc0029; --svc-soft: rgb(229 0 45 / .09); }
+  :root:not([data-theme="dark"]) [data-service="soundcloud"], :root:not([data-theme="dark"])[data-service="soundcloud"] { --svc-ink: #c2410c; --svc-soft: rgb(255 85 0 / .1); }
+  :root:not([data-theme="dark"]) [data-service="bandcamp"], :root:not([data-theme="dark"])[data-service="bandcamp"] { --svc-ink: #0e7490; --svc-soft: rgb(29 160 195 / .11); }
+}
+:root[data-theme="light"] [data-service="youtube"], :root[data-theme="light"] [data-service="youtubeMusic"],
+:root[data-theme="light"][data-service="youtube"], :root[data-theme="light"][data-service="youtubeMusic"] { --svc-ink: #cc0029; --svc-soft: rgb(229 0 45 / .09); }
+:root[data-theme="light"] [data-service="soundcloud"], :root[data-theme="light"][data-service="soundcloud"] { --svc-ink: #c2410c; --svc-soft: rgb(255 85 0 / .1); }
+:root[data-theme="light"] [data-service="bandcamp"], :root[data-theme="light"][data-service="bandcamp"] { --svc-ink: #0e7490; --svc-soft: rgb(29 160 195 / .11); }
+:root[data-theme="light"] [data-service="other"] { --svc: #111113; --svc-ink: #111113; --svc-fill: #111113; --svc-on: #ffffff; --svc-soft: rgb(0 0 0 / .06); }
+
+*, *::before, *::after { box-sizing: border-box; }
+html { background: var(--ground); }
+body { margin: 0; background: var(--ground); color: var(--text); font-family: var(--font-sans); font-feature-settings: "ss01", "cv11"; -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; letter-spacing: inherit; }
+button, a, input, select, summary { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--svc-ink); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--svc) 35%, transparent); color: var(--text); }
+input, textarea { caret-color: var(--svc-ink); }
+* { scrollbar-width: thin; scrollbar-color: var(--hair-strong) transparent; }
+[hidden] { display: none !important; }
+.mono, .tabular { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.service-mark { display: inline-flex; align-items: center; gap: 5px; color: var(--svc-ink); font-weight: 550; white-space: nowrap; }
+.service-mark svg { width: 13px; height: 13px; fill: currentColor; stroke: none; flex: none; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

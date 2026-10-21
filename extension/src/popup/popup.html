@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Siphon</title>
+  <link rel="stylesheet" href="../shared/ui/tokens.css">
+  <link rel="stylesheet" href="../shared/ui/music.css">
+  <link rel="stylesheet" href="popup.css">
+  <script type="module" src="popup.js"></script>
+</head>
+<body>
+  <div class="ambient" id="ambient" aria-hidden="true"></div>
+  <header class="bar">
+    <div class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4v8a6 6 0 0 0 12 0V4"/><path d="M10 4v8a2 2 0 0 0 4 0V4"/></svg><h1>Siphon</h1></div>
+    <span id="host-status" class="host-status" tabindex="0" role="status" title="Connecting to the native host"><i></i><span>Connecting</span></span>
+    <button id="settings" class="icon-button" title="Settings" aria-label="Open settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
+  </header>
+  <main>
+    <aside id="setup" class="setup" hidden><strong>Connect your audio engine</strong><p>Install the Siphon host to start downloading.</p><a href="../options/options.html#setup" data-options="setup">Open setup</a></aside>
+
+    <section aria-label="Now on this tab" class="source-panel" id="source-panel">
+      <div id="source" class="source-card" aria-busy="true"><div class="skeleton-art skeleton"></div><div class="skeleton-copy"><div class="skeleton"></div><div class="skeleton short"></div><p>Looking at this tab…</p></div></div>
+      <div class="source-analysis"><button type="button" id="analyze" class="ghost" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 11v2"/></svg>Analyze</button><div id="tab-analysis" role="status" aria-live="polite"></div></div>
+      <div id="playlist-control" class="playlist-control" hidden><span id="playlist-count"></span><div class="segments playlist-segments" role="group" aria-label="Playlist selection"><button type="button" data-playlist="single" aria-pressed="true">This track</button><button type="button" data-playlist="all" aria-pressed="false">Whole playlist</button></div></div>
+    </section>
+
+    <div class="url-field"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 14 4-4M8.5 16.5l-1 1a3.5 3.5 0 0 1-5-5l3-3a3.5 3.5 0 0 1 5 0M15.5 7.5l1-1a3.5 3.5 0 0 1 5 5l-3 3a3.5 3.5 0 0 1-5 0"/></svg><input id="url" type="url" aria-label="Paste a media URL" placeholder="Or paste a link" autocomplete="off" spellcheck="false"><button id="clear-url" class="icon-button small" type="button" aria-label="Use current tab instead" title="Use current tab" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button></div>
+
+    <form id="download-form" novalidate>
+      <div class="row-heading"><h2>Format</h2><label id="quality-label" class="quality"><span>Quality</span><select id="quality" aria-label="Audio quality"><option value="320">320 kbps</option><option value="256">256 kbps</option><option value="192">192 kbps</option><option value="128">128 kbps</option><option value="V0">V0 · variable</option><option value="best">Best</option></select></label></div>
+      <div id="formats" class="segments formats" role="group" aria-label="Audio format"><button type="button" data-format="mp3" aria-pressed="true">MP3</button><button type="button" data-format="m4a" aria-pressed="false">M4A</button><button type="button" data-format="flac" aria-pressed="false">FLAC</button><button type="button" data-format="opus" aria-pressed="false">Opus</button><button type="button" data-format="ogg" aria-pressed="false">Ogg</button><button type="button" data-format="wav" aria-pressed="false">WAV</button><button type="button" data-format="best" aria-pressed="false">Original</button></div>
+      <div class="options-row">
+        <label class="switch-row"><input id="append-bpm-key" class="switch" type="checkbox"><span>BPM &amp; key in filename</span></label>
+        <details id="trim"><summary>Trim</summary><div class="trim-fields"><label>Start<input id="trim-start" inputmode="numeric" placeholder="0:00" aria-describedby="trim-help"></label><span aria-hidden="true">–</span><label>End<input id="trim-end" inputmode="numeric" placeholder="end" aria-describedby="trim-help"></label></div><p id="trim-help">mm:ss. Leave either side blank to keep it.</p></details>
+      </div>
+      <p id="message" class="message" role="status" hidden></p>
+      <button id="download" class="download-button" type="submit" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19h14"/></svg><span>Download audio</span><kbd>Enter</kbd></button>
+    </form>
+
+    <section id="queue-section" class="list-section" aria-labelledby="queue-heading" hidden><div class="row-heading"><h2 id="queue-heading">Downloading <span id="queue-count" class="count mono"></span></h2></div><div id="queue" class="list"></div></section>
+    <section class="list-section" aria-labelledby="recent-heading"><div class="row-heading"><h2 id="recent-heading">Recent</h2><a href="../options/options.html#history" data-options="history">History</a></div><div id="recent" class="list"><p class="empty-recent">Downloads land here, ready to drag into your DAW.</p></div></section>
+  </main>
+  <div id="progress-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>
