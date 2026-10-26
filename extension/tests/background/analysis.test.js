@@ -115,3 +115,31 @@ test('a finished download opens the drag tray instead of a toast when the host s
   await notifications.terminal({id:'done',state:'done',title:'Song',format:'wav',file:'C:\Music\Song.wav',analysis});
   assert.equal(calls.length, 1);
 });
+test('late analysis event updates history, renamed path, cache and keeps the host alive until it lands', async () => {
+  const counts = [], updates = [];
+  const chrome = createChromeMock({});
+  const cache = new AnalysisCache(chrome); await cache.init();
+  const native = new NativeManager(chrome,{getSettings:async () => DEFAULT_SETTINGS});
+  const jobs = new Jobs(chrome,{native,getSettings:async () => DEFAULT_SETTINGS,analysisCache:cache,onCount:(n,a = 0) => counts.push([n,a]),onAnalysis:(item,previous) => updates.push([item,previous])});
+  await jobs.init();
+  const url = 'https://www.youtube.com/watch?v=late';
+  await jobs.event({type:'job',jobId:'j1',url,state:'downloading'});
+  await jobs.event({type:'job',jobId:'j1',url,state:'done',file:'C:\M\a.mp3',files:['C:\M\a.mp3'],analysis:null,analyses:[],analysisPending:1});
+  assert.deepEqual(counts.at(-1),[0,1]);
+  assert.equal(jobs.history[0].analysis,null);
+  await jobs.analysis({type:'analysis',jobId:'j1',source:'C:\M\a.mp3',file:'C:\M\a [120 BPM Am].mp3',files:['C:\M\a [120 BPM Am].mp3'],analysis,pending:0});
+  assert.deepEqual(counts.at(-1),[0,0]);
+  const item = jobs.history[0];
+  assert.equal(item.file,'C:\M\a [120 BPM Am].mp3'); assert.deepEqual(item.files,['C:\M\a [120 BPM Am].mp3']);
+  assert.deepEqual(item.analysis,analysis); assert.equal(item.analyses.length,1);
+  assert.deepEqual(cache.get(url).analysis,analysis);
+  assert.equal(updates[0][1].file,'C:\M\a.mp3');
+  assert.equal(chrome.storage.local.data.history[0].file,'C:\M\a [120 BPM Am].mp3');
+});
+test('hello sends the protocol version', async () => {
+  const x = await setup();
+  try {
+    await x.native.connect();
+    assert.equal(x.chrome.calls.native.find(r => r.type === 'hello').protocolVersion,1);
+  } finally { x.native.disconnect(); }
+});

@@ -17,9 +17,27 @@ function Get-SiphonRegistryPaths {
 
 function Register-SiphonHost {
     param([string]$ManifestPath, [string]$RegistryRoot = 'HKCU:\Software')
-    foreach ($key in @(Get-SiphonRegistryPaths $RegistryRoot)) {
-        New-Item -Path $key -Force -ErrorAction Stop | Out-Null
-        Set-Item -LiteralPath $key -Value $ManifestPath -ErrorAction Stop
+    $previous = @()
+    try {
+        foreach ($key in @(Get-SiphonRegistryPaths $RegistryRoot)) {
+            $exists = Test-Path -LiteralPath $key
+            $value = $null
+            if ($exists) { $value = (Get-Item -LiteralPath $key).GetValue('') }
+            $previous += @{ Path = $key; Exists = $exists; Value = $value }
+            New-Item -Path $key -Force -ErrorAction Stop | Out-Null
+            Set-Item -LiteralPath $key -Value $ManifestPath -ErrorAction Stop
+        }
+    }
+    catch {
+        $failure = $_
+        foreach ($entry in $previous) {
+            if ($entry.Exists) {
+                if ($null -eq $entry.Value) { Remove-ItemProperty -LiteralPath $entry.Path -Name '(default)' -ErrorAction SilentlyContinue }
+                else { Set-Item -LiteralPath $entry.Path -Value $entry.Value -ErrorAction Continue }
+            }
+            elseif (Test-Path -LiteralPath $entry.Path) { Remove-Item -LiteralPath $entry.Path -Force -ErrorAction Continue }
+        }
+        throw $failure
     }
 }
 
@@ -112,8 +130,10 @@ function Read-SiphonBytes {
     return ,$buffer
 }
 
-function Test-SiphonHost {
-    param([string]$LauncherPath, [int]$TimeoutMs = 45000)
+function Invoke-SiphonHostRequest {
+    param([string]$LauncherPath, [string]$RequestJson, [int]$TimeoutMs = 45000,
+          [hashtable]$Environment = @{})
+    $requestObject = $RequestJson | ConvertFrom-Json
     $start = New-Object Diagnostics.ProcessStartInfo
     $start.FileName = $env:ComSpec
     $start.Arguments = '/d /s /c ""' + $LauncherPath + '""'
@@ -122,6 +142,7 @@ function Test-SiphonHost {
     $start.RedirectStandardInput = $true
     $start.RedirectStandardOutput = $true
     $start.RedirectStandardError = $true
+    foreach ($name in $Environment.Keys) { $start.EnvironmentVariables[$name] = [string]$Environment[$name] }
     $process = New-Object Diagnostics.Process
     $process.StartInfo = $start
     $stderr = $null
@@ -148,7 +169,7 @@ function Test-SiphonHost {
             if ($null -ne $originalInputEncoding) { [Console]::InputEncoding = $originalInputEncoding }
         }
         $stderr = $process.StandardError.ReadToEndAsync()
-        $request = [Text.Encoding]::UTF8.GetBytes('{"id":"t","type":"hello","extVersion":"installer"}')
+        $request = [Text.Encoding]::UTF8.GetBytes($RequestJson)
         $prefix = [BitConverter]::GetBytes([uint32]$request.Length)
         if (-not [BitConverter]::IsLittleEndian) { [Array]::Reverse($prefix) }
         $process.StandardInput.BaseStream.Write($prefix, 0, 4)
@@ -163,9 +184,8 @@ function Test-SiphonHost {
             if ($length -lt 2 -or $length -gt 1048576) { throw "Invalid native message length: $length. Check stdout for accidental logging." }
             $body = Read-SiphonBytes $process.StandardOutput.BaseStream ([int]$length) $timer $TimeoutMs
             $reply = [Text.Encoding]::UTF8.GetString($body) | ConvertFrom-Json -ErrorAction Stop
-        } until ($reply.PSObject.Properties['id'] -and $reply.id -eq 't')
-        if ($reply.type -ne 'result' -or -not $reply.ok) { throw ('Host rejected hello: ' + ($reply | ConvertTo-Json -Depth 8 -Compress)) }
-        if (-not $reply.data.hostVersion) { throw 'Hello reply did not include hostVersion.' }
+        } until ($reply.PSObject.Properties['id'] -and $reply.id -eq $requestObject.id)
+        if ($reply.type -ne 'result' -or -not $reply.ok) { throw ('Host rejected ' + $requestObject.type + ': ' + ($reply | ConvertTo-Json -Depth 8 -Compress)) }
         return $reply.data
     }
     catch {
@@ -177,10 +197,35 @@ function Test-SiphonHost {
         if ($started) {
             $process.StandardInput.Close()
             if (-not $process.WaitForExit(2000)) {
-                # cmd.exe owns the Python child; kill the entire tree on failure/timeout.
+                # cmd.exe owns the helper child; kill the entire tree on failure/timeout.
                 & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null
             }
         }
         $process.Dispose()
     }
+}
+
+function Test-SiphonHost {
+    param([string]$LauncherPath, [int]$TimeoutMs = 45000)
+    $hello = Invoke-SiphonHostRequest -LauncherPath $LauncherPath -TimeoutMs $TimeoutMs -RequestJson '{"id":"t","type":"hello","extVersion":"installer"}'
+    if (-not $hello.PSObject.Properties['hostVersion'] -or -not $hello.hostVersion) { throw 'Hello reply did not include hostVersion.' }
+    return $hello
+}
+
+function New-SiphonRustLauncher {
+    param([string]$LauncherPath, [string]$ExecutablePath, [string[]]$ExtraPaths = @())
+    $lines = @('@echo off', 'setlocal DisableDelayedExpansion', 'chcp 65001 >nul',
+        ('set "PATH=' + (($ExtraPaths -join ';').Replace('%', '%%')) + ';%PATH%"'),
+        ('"' + $ExecutablePath.Replace('%', '%%') + '"'), 'exit /b %errorlevel%')
+    Write-SiphonUtf8 $LauncherPath (($lines -join "`r`n") + "`r`n")
+}
+
+function Remove-SiphonChildDirectory {
+    param([string]$Path, [string]$Parent)
+    $resolved = [IO.Path]::GetFullPath($Path).TrimEnd('\')
+    $boundary = [IO.Path]::GetFullPath($Parent).TrimEnd('\') + '\'
+    if (-not $resolved.StartsWith($boundary, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Refusing to remove a directory outside the expected parent.'
+    }
+    if (Test-Path -LiteralPath $resolved) { Remove-Item -LiteralPath $resolved -Recurse -Force }
 }

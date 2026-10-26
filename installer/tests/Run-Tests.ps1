@@ -7,3 +7,4 @@ if (Get-Module -ListAvailable -Name Pester) {
 else {
     & (Join-Path $PSScriptRoot 'Test-Installer.ps1')
 }
+& (Join-Path $PSScriptRoot 'Test-RustInstall.ps1')

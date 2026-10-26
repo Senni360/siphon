@@ -453,3 +453,40 @@ def test_numerical_worker_preserves_engine_error_codes(monkeypatch):
         service._remote_analyze("missing.mp3", bpm_range=(70, 180), max_seconds=None)
     assert caught.value.code == "DISK" and str(caught.value) == "missing audio"
     assert available.get_nowait() is process
+
+
+def test_deferred_analysis_finishes_job_first_then_emits_renamed_analysis(tmp_path, mocked, monkeypatch):
+    gate = threading.Event()
+    monkeypatch.setattr(jobs, "analyze", lambda path, **kw: gate.wait(5) and RESULT.copy())
+    manager, events = manager_for(tmp_path, ["track.mp3"])
+    manager.defer_analysis = True
+    try:
+        job = manager.create("late", "https://example.org/a", validate_options({"outputDir": str(tmp_path)}))
+        manager._download(job, None)
+        done = job.snapshot()
+        assert done["state"] == "done" and done["analysis"] is None and done["analysisPending"] == 1
+        assert done["file"].endswith("track.mp3") and "analyzing" not in [e.get("state") for e in events]
+        gate.set()
+        wait_for(lambda: any(e.get("type") == "analysis" for e in events))
+        event = next(e for e in events if e.get("type") == "analysis")
+        assert event["jobId"] == "late" and event["source"].endswith("track.mp3")
+        assert event["file"].endswith("track [121 BPM Am].mp3") and event["files"] == [event["file"]]
+        assert event["analysis"] == RESULT and event["pending"] == 0
+        after = job.snapshot()
+        assert after["state"] == "done" and after["file"] == event["file"] and after["analysis"] == RESULT
+    finally:
+        gate.set()
+        manager.shutdown()
+
+
+def test_hello_negotiates_protocol_version(mocked, monkeypatch):
+    writer = RecordingWriter()
+    instance = host(writer)
+    monkeypatch.setattr(instance, "_warm_tray", lambda: None)
+    try:
+        instance.dispatch({"id": "old", "type": "hello"})
+        assert writer.messages[-1]["data"]["protocolVersion"] == 1 and not instance.jobs.defer_analysis
+        instance.dispatch({"id": "new", "type": "hello", "protocolVersion": 1})
+        assert instance.jobs.defer_analysis
+    finally:
+        instance.shutdown()

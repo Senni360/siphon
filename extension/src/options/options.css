@@ -163,3 +163,22 @@ kbd { font-size: 11px; border: 1px solid var(--border); border-bottom-width: 2px
 :root[data-theme="light"] :is(.folder-path, .preview, .code-block, pre) { background: rgb(0 0 0 / .035); }
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) :is(.folder-path, .preview, .code-block, pre) { background: rgb(0 0 0 / .035); } }
 @media (max-width: 1100px) { .history-item { grid-template-columns: 44px minmax(0,1fr); } .history-actions { grid-column: 2; } }
+
+/* Local stem controls stay visible, independent of the hover-only file actions. */
+.stem-controls { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; cursor: auto; }
+.stem-controls p { flex-basis: 100%; margin: 0; font-size: 11px; line-height: 1.45; color: var(--text-2); overflow-wrap: anywhere; }
+.stem-controls button, .stems-explanation button { color: var(--text); background: var(--pane); border: 1px solid var(--hair); border-radius: 8px; padding: 5px 8px; font: inherit; font-size: 11px; cursor: pointer; }
+.stem-controls button:hover, .stems-explanation button:hover { background: var(--pane-strong); }
+.stem-controls button:disabled { opacity: .5; cursor: default; }
+.stems-explanation { max-width: min(420px, calc(100vw - 32px)); box-sizing: border-box; color: var(--text); background: var(--ground-lift, #141418); border: 1px solid var(--hair); border-radius: 14px; padding: 20px; }
+.stems-explanation::backdrop { background: rgb(0 0 0 / .65); }
+.stems-explanation h2 { font-size: 18px; }
+.stems-explanation p { font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.stems-explanation button + button { margin-left: 8px; }
+
+.stem-controls select { width: 100%; min-width: 0; color: var(--text); background: var(--ground-lift); border: 1px solid var(--hair); border-radius: 8px; padding: 6px; font: inherit; font-size: 11px; }
+#active-stems[hidden] { display: none; }
+#active-stems { margin-bottom: 16px; }
+#active-stems h2 { font-size: 13px; margin: 0 0 8px; }
+.active-stem { padding: 10px; border: 1px solid var(--hair); border-radius: 10px; margin-top: 6px; }
+.active-stem > p { margin: 0; font-size: 12px; overflow-wrap: anywhere; }

@@ -1,3 +1,4 @@
+import { stemControls, renderActiveStems } from '../popup/stems-ui.js';
 import { CMD, EVT, send } from '../shared/protocol.js';
 import { mergeSettings } from '../shared/settings.js';
 import { formatBytes } from '../shared/ui/format.js';
@@ -108,6 +109,7 @@ function siteLabel(item) {
 }
 function thumbnail(url) { if (!url) return ''; try { const u = new URL(url, location.href); return ['https:','http:'].includes(u.protocol) ? escape(u.href) : ''; } catch { return ''; } }
 function historyRows() {
+  const focusedKey = document.activeElement?.dataset.key;
   const items = state.history.filter(item => (historyFilter === 'all' || item.state === historyFilter) && `${item.title} ${siteLabel(item)} ${SERVICE_NAMES[serviceOf(item)]} ${item.format} ${item.analysis?.bpm || ''} ${item.analysis?.key || ''} ${item.analysis?.keyShort || ''} ${item.analysis?.camelot || ''} ${item.analysis?.openKey || ''}`.toLowerCase().includes(historyQuery.toLowerCase()) && (historyAnalysis === 'all' || (historyAnalysis === 'analyzed' ? !!item.analysis : !item.analysis)));
   if (historySort !== 'recent') items.sort((a,b) => a.analysis?.bpm == null ? (b.analysis?.bpm == null ? 0 : 1) : b.analysis?.bpm == null ? -1 : (a.analysis.bpm - b.analysis.bpm) * (historySort === 'bpm-desc' ? -1 : 1));
   $('#history-count').textContent = `${items.length} of ${state.history.length} downloads`;
@@ -122,10 +124,13 @@ function historyRows() {
     node.replaceWith(mark);
   });
   document.querySelectorAll('[data-analysis-id]').forEach(node => { const item = state.history.find(i => (i.id || i.jobId) === node.dataset.analysisId); if (item?.analysis) node.append(analysisChips(item.analysis,state.settings.keyNotation)); });
+  document.querySelectorAll('[data-analysis-id]').forEach(node => { const item = state.history.find(i => i.id === node.dataset.analysisId); if (item?.state === 'done' && (item.file || item.files?.length)) node.after(stemControls(item, state, text => showError(new Error(text)), historyRows)); });
+  renderActiveStems($('#active-stems'), state, text => showError(new Error(text)), $('#history-list'));
   $('#history-export-json').disabled = $('#history-export-csv').disabled = $('#clear-history').disabled = !state.history.length;
+  if (focusedKey?.startsWith('stem-')) [...document.querySelectorAll('[data-key]')].find(button => button.dataset.key === focusedKey)?.focus({ preventScroll: true });
 }
 function history() {
-  return `<div class="toolbar"><input type="search" id="history-search" aria-label="Search history" placeholder="Search title, site, BPM, or key" value="${escape(historyQuery)}"><select id="history-filter" aria-label="Filter history by status">${[['all','All states'],['done','Complete'],['error','Failed'],['cancelled','Cancelled']].map(([value,label]) => `<option value="${value}" ${historyFilter === value ? 'selected' : ''}>${label}</option>`).join('')}</select><select id="history-analysis-filter" aria-label="Filter history by analysis">${[['all','All analyses'],['analyzed','With BPM & key'],['missing','Without analysis']].map(([v,l]) => `<option value="${v}" ${historyAnalysis === v ? 'selected' : ''}>${l}</option>`).join('')}</select><select id="history-sort" aria-label="Sort history">${[['recent','Most recent'],['bpm-asc','BPM · low to high'],['bpm-desc','BPM · high to low']].map(([v,l]) => `<option value="${v}" ${historySort === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div><p class="history-count" id="history-count"></p><div id="history-list" class="history-list"></div><div class="history-footer"><div class="inline"><button id="history-export-json" data-action="export-json">Export JSON</button><button id="history-export-csv" data-action="export-csv">Export CSV</button></div><button id="clear-history" class="danger quiet" data-action="clear-history">Clear history</button></div><p class="hint">Removing history keeps your downloaded files.</p>`;
+  return `<section id="active-stems" aria-label="Active stems" hidden></section><div class="toolbar"><input type="search" id="history-search" aria-label="Search history" placeholder="Search title, site, BPM, or key" value="${escape(historyQuery)}"><select id="history-filter" aria-label="Filter history by status">${[['all','All states'],['done','Complete'],['error','Failed'],['cancelled','Cancelled']].map(([value,label]) => `<option value="${value}" ${historyFilter === value ? 'selected' : ''}>${label}</option>`).join('')}</select><select id="history-analysis-filter" aria-label="Filter history by analysis">${[['all','All analyses'],['analyzed','With BPM & key'],['missing','Without analysis']].map(([v,l]) => `<option value="${v}" ${historyAnalysis === v ? 'selected' : ''}>${l}</option>`).join('')}</select><select id="history-sort" aria-label="Sort history">${[['recent','Most recent'],['bpm-asc','BPM · low to high'],['bpm-desc','BPM · high to low']].map(([v,l]) => `<option value="${v}" ${historySort === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div><p class="history-count" id="history-count"></p><div id="history-list" class="history-list"></div><div class="history-footer"><div class="inline"><button id="history-export-json" data-action="export-json">Export JSON</button><button id="history-export-csv" data-action="export-csv">Export CSV</button></div><button id="clear-history" class="danger quiet" data-action="clear-history">Clear history</button></div><p class="hint">Removing history keeps your downloaded files.</p>`;
 }
 const installCommand = 'powershell -NoProfile -ExecutionPolicy Bypass -File .\\installer\\install.ps1';
 function step(n,title,body,complete) { return `<div class="step"><span class="step-number ${complete ? 'complete' : ''}" aria-label="${complete ? 'Complete' : `Step ${n}`}">${complete ? '✓' : n}</span><div><h3>${title}</h3>${body}</div></div>`; }
@@ -339,6 +344,7 @@ window.addEventListener('hashchange', () => { flushSave(); render(); });
 window.addEventListener('pagehide', flushSave);
 document.addEventListener('visibilitychange', () => { if (document.hidden) flushSave(); });
 chrome.runtime.onMessage.addListener(message => {
+  if (message.evt === EVT.STEMS) { state.stems = message.stems; if (current === 'history') historyRows(); }
   if (message.evt === EVT.HOST) { state.host = message.status; renderHost(); }
   if (message.evt === EVT.HISTORY) { state.history = message.history || []; if (current === 'history') historyRows(); }
   if (message.evt === EVT.SETTINGS) {

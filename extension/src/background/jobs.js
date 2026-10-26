@@ -5,21 +5,35 @@ import { siteCookies } from './cookies.js';
 import { broadcast, errorData, failure, timer } from './common.js';
 
 export class Jobs {
-  constructor(chrome, { native, getSettings, analysisCache, onTerminal = () => {}, onCount = () => {} }) {
-    Object.assign(this, { chrome, native, getSettings, analysisCache, onTerminal, onCount });
+  constructor(chrome, { native, getSettings, analysisCache, onTerminal = () => {}, onAnalysis = () => {}, onCount = () => {}, analysisTimeoutMs = 180_000 }) {
+    Object.assign(this, { chrome, native, getSettings, analysisCache, onTerminal, onAnalysis, onCount, analysisTimeoutMs });
     this.jobs = new Map();
     this.history = [];
     this.writes = Promise.resolve();
     this.lastBroadcast = 0;
     this.terminalUpdates = new Map();
+    // Finished jobs whose BPM/key the host is still computing (jobId -> fallback timer).
+    this.awaiting = new Map();
   }
   async init() {
     const [session, local] = await Promise.all([this.chrome.storage.session.get('jobs'), this.chrome.storage.local.get('history')]);
     for (const job of session.jobs || []) if (!TERMINAL_STATES.has(job.state)) this.jobs.set(job.jobId, { ...job, submitted: true });
     this.history = (local.history || []).slice(0, 500);
-    this.onCount(this.jobs.size);
+    this.count();
   }
   list() { return [...this.jobs.values()]; }
+  count() { this.onCount(this.jobs.size, this.awaiting.size); }
+  awaitAnalysis(jobId) {
+    clearTimeout(this.awaiting.get(jobId));
+    this.awaiting.set(jobId, timer(() => this.settle(jobId), this.analysisTimeoutMs));
+    this.count();
+  }
+  settle(jobId) {
+    if (!this.awaiting.has(jobId)) return;
+    clearTimeout(this.awaiting.get(jobId));
+    this.awaiting.delete(jobId);
+    this.count();
+  }
   persist() {
     const jobs = structuredClone(this.list());
     const history = structuredClone(this.history);
@@ -50,7 +64,7 @@ export class Jobs {
     const now = Date.now();
     const job = { jobId, url, title: title || url, source: source || siteForUrl(value), options, state: 'queued', progress: null, createdAt: now, updatedAt: now, submitted: false };
     this.jobs.set(jobId, job);
-    this.onCount(this.jobs.size);
+    this.count();
     this.publish();
     await this.persist();
     try {
@@ -81,7 +95,8 @@ export class Jobs {
       // Cookie payloads never enter a persisted job or history record.
       delete history.cookies;
       this.history = [history, ...this.history.filter(item => item.id !== job.jobId)].slice(0, 500);
-      this.onCount(this.jobs.size);
+      if (job.state === 'done' && job.analysisPending > 0) this.awaitAnalysis(job.jobId);
+      this.count();
       this.publish(job);
       if (job.state === 'done' && job.analysis) await this.analysisCache?.set(job.url, {analysis:job.analysis,title:job.title});
       await this.persist();
@@ -89,17 +104,62 @@ export class Jobs {
       await this.onTerminal(history);
     } else {
       this.jobs.set(job.jobId, job);
-      this.onCount(this.jobs.size);
+      this.count();
       this.publish();
       await this.persist();
     }
   }
   async resync(hostJobs) {
+    // A fresh host process has dropped any analysis the previous one owed us.
+    for (const jobId of [...this.awaiting.keys()]) this.settle(jobId);
+    // Restore deferred analysis after worker reload; a new host may have lost it.
+    let historyChanged = false;
+    this.history = this.history.map(item => {
+      if (!(item.analysisPending > 0)) return item;
+      const snapshot = hostJobs.find(job => job.jobId === item.id);
+      const pending = snapshot?.analysisPending || 0;
+      if (pending) this.awaitAnalysis(item.id);
+      historyChanged = true;
+      return { ...item, analysisPending: pending, file: snapshot?.file || item.file, files: snapshot?.files || item.files };
+    });
+    if (historyChanged) {
+      await this.persist();
+      await broadcast(this.chrome, { evt: EVT.HISTORY, history: this.history });
+    }
     const known = new Set(hostJobs.map(job => job.jobId));
     for (const job of hostJobs) await this.event({ ...job, submitted: true });
     for (const job of this.list()) if (job.submitted && !known.has(job.jobId)) {
       await this.event({ jobId: job.jobId, state: 'error', error: { code: 'INTERNAL', message: 'The native host stopped before this download finished. Retry the download.' } });
     }
+  }
+  // Late BPM/key for one file of a job, which may already be in history.
+  // The host may have renamed `source` to `file` to add the BPM/key suffix.
+  async analysis({ jobId, source, file, files, analysis, analysisError, pending }) {
+    if (!pending) this.settle(jobId);
+    const entry = { file, analysis, ...(analysisError ? { analysisError } : {}) };
+    const rename = path => path === source ? file : path;
+    const merge = item => ({
+      ...item, analysisPending: pending ?? 0, file: rename(item.file), files: files?.length ? files : item.files?.map(rename),
+      analysis: analysis || item.analysis || null, analyses: [...(item.analyses || []), entry],
+      analysisError: analysisError || item.analysisError || null,
+    });
+    if (this.jobs.has(jobId)) {
+      this.jobs.set(jobId, merge(this.jobs.get(jobId)));
+      this.publish();
+      await this.persist();
+      return;
+    }
+    const index = this.history.findIndex(item => item.id === jobId);
+    if (index < 0) return;
+    const previous = this.history[index];
+    const item = merge(previous);
+    this.history = this.history.map((value, i) => i === index ? item : value);
+    // In-page controls read BPM/key from the jobs broadcast, not history.
+    this.publish(item);
+    if (analysis) await this.analysisCache?.set(item.url, { analysis, title: item.title });
+    await this.persist();
+    await broadcast(this.chrome, { evt: EVT.HISTORY, history: this.history });
+    await this.onAnalysis(item, previous);
   }
   async retry(jobId) {
     const job = this.jobs.get(jobId) || this.history.find(item => item.id === jobId);

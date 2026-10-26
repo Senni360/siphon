@@ -26,5 +26,6 @@ testpaths = ["tests"]
 pythonpath = ["."]
 
 # Install with: pip install --group host/pyproject.toml:analysis
+# Kept additive: the host's package metadata may be edited by other workstreams.
 [dependency-groups]
 analysis = ["numpy>=2.2", "scipy>=1.15"]

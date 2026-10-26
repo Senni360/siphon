@@ -1,6 +1,7 @@
 import { CMD, EVT } from '../shared/protocol.js';
 import { getSettings, setSettings } from '../shared/settings.js';
 import { NativeManager } from './native.js';
+import { Stems } from './stems.js';
 import { Jobs } from './jobs.js';
 import { Badge } from './badge.js';
 import { Notifications, friendlyError } from './notify.js';
@@ -12,22 +13,30 @@ import { AnalysisCache } from './analysis.js';
 export function startBackground(api = chrome) {
   // Shared settings helpers refer to the extension's global chrome API.
   const badge = new Badge(api);
-  let jobs;
+  let jobs, stems;
+  let downloadCount = 0, stemCount = 0;
+  const updateCount = () => native.setActiveJobs(downloadCount + stemCount);
   let notifications;
   const analysisCache = new AnalysisCache(api);
   const native = new NativeManager(api, {
     getSettings,
     onJob: event => jobs.event(event),
+    onAnalysis: event => jobs.analysis(event),
     onResync: snapshot => jobs.resync(snapshot),
+    onStem: event => stems.event(event),
+    onStemResync: snapshot => stems.resync(snapshot),
   });
   jobs = new Jobs(api, {
     native, getSettings, analysisCache,
-    onCount: count => { native.setActiveJobs(count); void badge.setCount(count).catch(console.error); },
+    // Jobs whose BPM/key are still coming keep the host alive but aren't counted on the badge.
+    onCount: (count, analyzing = 0) => { downloadCount = count + analyzing; updateCount(); void badge.setCount(count).catch(console.error); },
     onTerminal: job => notifications.terminal(job).catch(console.error),
+    onAnalysis: (item, previous) => notifications.analysis(item, previous).catch(console.error),
   });
+  stems = new Stems(api, { native, jobs, onCount: count => { stemCount = count; updateCount(); } });
   notifications = new Notifications(api, { native, getSettings, badge, findJob: id => jobs.history.find(job => job.id === id) });
-  const ready = Promise.all([jobs.init(), analysisCache.init()]);
-  const { route } = createRouter({ chrome: api, ready, native, jobs, getSettings, setSettings, analysisCache });
+  const ready = Promise.all([jobs.init(), stems.init(), analysisCache.init()]);
+  const { route } = createRouter({ chrome: api, ready, native, jobs, stems, getSettings, setSettings, analysisCache });
   const entryError = async error => {
     await badge.flash(false);
     // Download failures already have job notifications; this also covers URL resolution.
@@ -41,7 +50,7 @@ export function startBackground(api = chrome) {
   });
   api.runtime.onStartup.addListener(() => {
     void ensureMenus().catch(console.error);
-    void ready.then(() => { if (jobs.list().length) return native.connect(); }).catch(console.error);
+    void ready.then(() => { if (jobs.list().length || stemCount) return native.connect(); }).catch(console.error);
   });
   api.runtime.onConnect.addListener(port => {
     if (!['siphon:ui', 'siphon-ui', 'popup', 'options'].includes(port.name)) return;
@@ -59,8 +68,8 @@ export function startBackground(api = chrome) {
       if (changes.settings.oldValue?.maxConcurrent !== settings.maxConcurrent) await native.configure(settings);
     }).catch(console.error);
   });
-  void ready.then(() => { if (jobs.list().length) return native.connect(); }).catch(console.error);
-  return { native, jobs, badge, notifications, route, ready };
+  void ready.then(() => { if (jobs.list().length || stemCount) return native.connect(); }).catch(console.error);
+  return { native, jobs, stems, badge, notifications, route, ready };
 }
 
 export const background = startBackground();

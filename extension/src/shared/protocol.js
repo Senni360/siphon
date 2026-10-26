@@ -1,10 +1,13 @@
 // Shared contract between popup / options / content scripts and the service worker.
-// Keep protocol changes backward compatible.
+// See SPEC.md. Additive changes only; note them in docs/CHANGELOG-SPEC.md.
 
 export const HOST_NAME = 'com.siphon.host';
+// Native-messaging contract version, sent in `hello` both ways. See docs/CHANGELOG-SPEC.md.
+export const PROTOCOL_VERSION = 1;
 
 // Native host request types (browser -> host)
 export const HOST = Object.freeze({
+  SPLIT_STEMS: 'splitStems', LIST_STEMS: 'listStems', CANCEL_STEMS: 'cancelStems',
   HELLO: 'hello',
   PROBE: 'probe',
   ANALYZE: 'analyze',
@@ -22,6 +25,7 @@ export const HOST = Object.freeze({
 
 // Internal commands (UI/content -> service worker), sent as { cmd, ...args }
 export const CMD = Object.freeze({
+  SPLIT_STEMS: 'splitStems', CANCEL_STEMS: 'cancelStems', SHOW_STEMS: 'showStems',
   GET_STATE: 'getState',            // -> { host, jobs, history, settings }
   PROBE: 'probe',                   // { url } -> MediaInfo
   ANALYZE: 'analyze',               // { url } -> { analysis, title? }
@@ -46,6 +50,7 @@ export const CMD = Object.freeze({
 
 // Broadcasts (service worker -> everyone), sent as { evt, ... }
 export const EVT = Object.freeze({
+  STEMS: 'stems',       // { stems: StemSnapshot[] }; separate from downloads
   JOBS: 'jobs',         // { jobs: JobState[] }; active snapshot + terminal transitions once
   HOST: 'host',         // { status: HostStatus }
   HISTORY: 'history',   // { history: HistoryItem[] }
@@ -69,7 +74,7 @@ export const ERR = Object.freeze({
 /**
  * HostStatus = {
  *   state: 'connecting' | 'ready' | 'missing' | 'error',
- *   hostVersion?, ytdlpVersion?, ffmpeg?: {found, version, path}, jsRuntime?, defaultOutputDir?,
+ *   hostVersion?, protocolVersion?, ytdlpVersion?, ffmpeg?: {found, version, path}, jsRuntime?, defaultOutputDir?,
  *   error?: { code, message }, restartRequired?: bool  // restart deferred until jobs finish
  * }
  * JobState = host `job` event fields + { url, source, options, createdAt, updatedAt }

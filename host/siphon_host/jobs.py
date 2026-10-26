@@ -1,5 +1,6 @@
 """Resizable download workers, cooperative cancellation, and bounded progress events."""
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import logging
@@ -40,6 +41,9 @@ class Job:
     partials: set = field(default_factory=set)
     completed_files: list = field(default_factory=list)
     processed_files: set = field(default_factory=set)
+    # Set for clients that accept `analysis` events: the job finishes as soon as
+    # its audio exists, and BPM/key arrive afterwards on this executor.
+    analysis_pool: ThreadPoolExecutor | None = None
 
     def __post_init__(self):
         self.data = {"type": "job", "jobId": self.job_id, "url": self.url, "source": self.source,
@@ -131,7 +135,19 @@ class Job:
             self.completed_files.append(path)
         if not self.options.get("analyze", True):
             return
+        if self.analysis_pool is not None:
+            with self.lock:
+                self.data["analysisPending"] = self.data.get("analysisPending", 0) + 1
+            self.analysis_pool.submit(self._deferred_analysis, path)
+            return
         self.update(state="analyzing", stage="analyzing", file=path, speed=None, eta=None)
+        entry = self._analyze_file(path)
+        self.update(file=entry["file"], files=self.completed_files.copy(), analysis=entry["analysis"],
+                    analyses=[*self.data["analyses"], entry],
+                    analysisError=entry.get("analysisError") or self.data["analysisError"])
+
+    def _analyze_file(self, path):
+        """Estimate, tag and rename one file; returns its `analyses` entry."""
         result, failure = None, None
         try:
             result = analyze(path, bpm_range=tuple(self.options.get("bpmRange") or (70, 180)), check_cancel=self.check_cancel)
@@ -158,6 +174,10 @@ class Job:
                     renamed = rename_with_suffix(path, suffix, overwrite=self.options.get("overwrite", False))
                     with self.lock:
                         self.completed_files[self.completed_files.index(path)] = renamed
+                        if self.data["file"] == path:
+                            self.data["file"] = renamed
+                        if self.data["files"]:
+                            self.data["files"] = [renamed if f == path else f for f in self.data["files"]]
                     path = renamed
                 except Exception as exc:
                     failure = error_details(exc)
@@ -165,9 +185,27 @@ class Job:
         entry = {"file": path, "analysis": result}
         if failure:
             entry["analysisError"] = failure
-        self.update(file=path, files=self.completed_files.copy(), analysis=result,
-                    analyses=[*self.data["analyses"], entry],
-                    analysisError=failure or self.data["analysisError"])
+        return entry
+
+    def _deferred_analysis(self, path):
+        entry = None
+        try:
+            entry = self._analyze_file(path)
+        except Cancelled:
+            pass
+        except Exception as exc:
+            logging.getLogger("siphon").exception("Deferred analysis failed for %s", path)
+            entry = {"file": path, "analysis": None, "analysisError": error_details(exc)}
+        with self.lock:
+            self.data["analysisPending"] = max(0, self.data.get("analysisPending", 1) - 1)
+            if entry is None:
+                return
+            # Applied even after the job is terminal: this is the point of deferral.
+            self.data.update(analyses=[*self.data["analyses"], entry], analysis=entry["analysis"] or self.data["analysis"],
+                             analysisError=entry.get("analysisError") or self.data["analysisError"], updatedAt=timestamp())
+            event = {"type": "analysis", "jobId": self.job_id, "source": path, **entry,
+                     "files": self.completed_files.copy(), "pending": self.data["analysisPending"]}
+        self.emit(event)
 
     def cleanup_parts(self):
         # Only touch exact filenames observed in this job's yt-dlp hooks.
@@ -201,6 +239,9 @@ class JobManager:
         self.workers = []
         self.active = 0
         self.stopped = False
+        self.defer_analysis = False
+        # analysis_service bounds numerical work globally; this only queues it.
+        self.analysis_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="analysis")
         self.resize(concurrency)
 
     def resize(self, concurrency):
@@ -228,7 +269,8 @@ class JobManager:
                         break
             if len(self.jobs) >= 1000:
                 raise HostError("BAD_REQUEST", "The download queue is full.")
-            job = Job(job_id, url, options, self.emit, source=source)
+            job = Job(job_id, url, options, self.emit, source=source,
+                      analysis_pool=self.analysis_pool if self.defer_analysis else None)
             self.jobs[job_id] = job
             return job
 
@@ -343,3 +385,4 @@ class JobManager:
             for job in self.jobs.values():
                 job.dispose()
             self.condition.notify_all()
+        self.analysis_pool.shutdown(wait=False, cancel_futures=True)

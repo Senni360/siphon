@@ -1,0 +1,23 @@
+[package]
+name = "siphon-host"
+description = "Siphon's native-messaging helper: downloads via yt-dlp, audio processing, tags and BPM/key"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "siphon-host"
+path = "src/main.rs"
+
+[dependencies]
+siphon-analysis = { path = "../siphon-analysis" }
+serde.workspace = true
+serde_json.workspace = true
+lofty.workspace = true
+ureq = { version = "3", default-features = false, features = ["rustls", "json"] }
+sha2 = "0.11"
+zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_Security", "Win32_Storage_FileSystem"] }

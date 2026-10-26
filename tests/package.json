@@ -7,6 +7,8 @@
     "host:live": "node e2e/host-protocol.mjs --live",
     "extension": "node e2e/extension.mjs",
     "sites": "node e2e/site-ui.mjs",
+    "analyzer": "node e2e/analyzer-ui.mjs",
+    "stems": "node e2e/stems-host.mjs",
     "static": "node --experimental-vm-modules e2e/static.mjs",
     "test": "node --test e2e/harness.test.mjs"
   },

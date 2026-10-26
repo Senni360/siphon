@@ -1,30 +1,58 @@
 import { mkdtemp, rm, readdir, stat, readFile } from 'node:fs/promises';
 import { existsSync, createReadStream } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve, join, dirname } from 'node:path';
+import { resolve, join, dirname, basename } from 'node:path';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { ROOT, Host, Report, frame, check, success, command, sleep, TERMINAL, skip } from './lib.mjs';
 import { MEDIA } from './fixtures.mjs';
 
 const args = new Set(process.argv.slice(2));
 if (args.has('--help')) {
-  console.log('node tests/e2e/host-protocol.mjs [--installed] [--live] [--local]\nDefault: offline protocol. --local: generated CC0 media over loopback; --live: CC/PD site probes and 8-second YouTube downloads. All output files are deleted.');
+  console.log('node tests/e2e/host-protocol.mjs [--rust | --installed] [--live] [--local]\nDefault: offline protocol. --rust uses SIPHON_HOST_BINARY when set, otherwise helper/target/release/siphon-host.exe. --local: generated CC0 media over loopback; --live: CC/PD site probes and 8-second YouTube downloads. All output files are deleted.');
   process.exit(0);
 }
-const report = new Report(args.has('--installed') ? 'host-installed' : args.has('--live') ? 'host-live' : args.has('--local') ? 'host-local' : 'host-protocol');
+const report = new Report((args.has('--rust') ? 'rust-' : '') + (args.has('--installed') ? 'host-installed' : args.has('--live') ? 'host-live' : args.has('--local') ? 'host-local' : 'host-protocol'));
 const temp = await mkdtemp(join(tmpdir(), 'siphon-e2e-host-'));
 const hosts = new Set(); let fixture;
+const rustBinary = resolve(process.env.SIPHON_HOST_BINARY || resolve(ROOT, 'helper/target/release/siphon-host.exe'));
+let registeredManifest;
+function installedManifest() {
+  if (registeredManifest) return registeredManifest;
+  // Helium uses Chromium's registration. Follow the same vendor keys as the
+  // installer, in priority order, rather than a legacy manifest left at root.
+  const query = String.raw`
+    [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+    foreach ($vendor in @('Chromium', 'Google\Chrome', 'Microsoft\Edge', 'BraveSoftware\Brave-Browser')) {
+      $key = 'HKCU:\Software\' + $vendor + '\NativeMessagingHosts\com.siphon.host'
+      if (Test-Path -LiteralPath $key) {
+        $manifest = (Get-Item -LiteralPath $key).GetValue('')
+        if ($manifest) { ConvertTo-Json -InputObject ([string]$manifest) -Compress; exit 0 }
+      }
+    }
+    exit 1
+  `;
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', query], { encoding: 'utf8', windowsHide: true, timeout: 10000 });
+  check(result.status === 0 && result.stdout.trim(), `No registered com.siphon.host manifest: ${result.error?.message || result.stderr || 'run the installer'}`);
+  registeredManifest = JSON.parse(result.stdout.trim());
+  check(existsSync(registeredManifest), `Registered manifest missing: ${registeredManifest}`);
+  console.log(`Installed native host manifest: ${registeredManifest}`);
+  return registeredManifest;
+}
 function launch() {
   let host;
   if (args.has('--installed')) {
-    const dir = join(process.env.LOCALAPPDATA, 'Siphon');
-    const manifest = ['com.siphon.host.json', 'native-host.json'].map(f => join(dir, f)).find(existsSync);
-    const launcher = manifest ? JSON.parse(requireText(manifest)).path : join(dir, 'siphon-host.cmd');
+    const manifest = installedManifest();
+    const launcher = JSON.parse(requireText(manifest)).path;
     check(existsSync(launcher), `Installed launcher missing: ${launcher}`);
     host = /\.(cmd|bat)$/i.test(launcher)
       ? new Host(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `""${launcher}" chrome-extension://bieofegakabfdjplcnpiaegdifmempmf/"`], { cwd: dirname(launcher), windowsVerbatimArguments: true })
       : new Host(launcher, ['chrome-extension://bieofegakabfdjplcnpiaegdifmempmf/'], { cwd: dirname(launcher) });
+  } else if (args.has('--rust')) {
+    const binary = rustBinary;
+    check(existsSync(binary), `Missing ${binary}; run cargo build --release in helper/`);
+    host = new Host(binary, ['chrome-extension://bieofegakabfdjplcnpiaegdifmempmf/'], { cwd: dirname(binary) });
   } else {
     const python = resolve(ROOT, 'host/.venv/Scripts/python.exe');
     check(existsSync(python), `Missing ${python}`);
@@ -83,7 +111,7 @@ async function inspect(file, format, duration = 8, metadata = true, art = true) 
   check((await stat(file)).size > 0, 'Output is empty');
   const data = JSON.parse(await command('ffprobe', ['-v', 'error', '-show_format', '-show_streams', '-of', 'json', file]));
   const audio = data.streams.find(s => s.codec_type === 'audio'); check(audio, 'No audio stream');
-  const expected = { mp3: 'mp3', m4a: 'aac', opus: 'opus', flac: 'flac', wav: 'pcm_s16le', best: null }[format];
+  const expected = { mp3: 'mp3', m4a: 'aac', opus: 'opus', ogg: 'vorbis', flac: 'flac', wav: 'pcm_s16le', best: null }[format];
   if (expected) check(audio.codec_name === expected, `${format}: codec=${audio.codec_name}, expected ${expected}`);
   check(data.streams.filter(s => s.codec_type === 'audio').length === 1, 'Unexpected audio stream count');
   const seconds = Number(data.format.duration || audio.duration);
@@ -93,7 +121,7 @@ async function inspect(file, format, duration = 8, metadata = true, art = true) 
   if (['m4a', 'opus'].includes(format)) check(bitrate > 0, `Missing bitrate: ${format}`);
   const tags = Object.fromEntries(Object.entries({ ...data.format.tags, ...audio.tags }).map(([k, v]) => [k.toLowerCase(), v]));
   if (metadata) check(tags.title && tags.artist, `Missing title/artist tags: ${JSON.stringify(tags)}`);
-  if (art && ['mp3', 'm4a', 'flac', 'opus'].includes(format)) check(data.streams.some(s => s.disposition?.attached_pic === 1), `No embedded cover art stream in ${format}`);
+  if (art && ['mp3', 'm4a', 'flac', 'opus', 'ogg'].includes(format)) check(data.streams.some(s => s.disposition?.attached_pic === 1), `No embedded cover art stream in ${format}`);
   return { codec: audio.codec_name, bitrate, seconds, title: tags.title, artist: tags.artist, attachedPicture: data.streams.some(s => s.disposition?.attached_pic === 1) };
 }
 async function localFixture() {
@@ -141,6 +169,15 @@ try {
   if (!host || host.failure) throw new Error('Host unavailable; remaining cases cannot run');
   await report.test('unknown request → BAD_REQUEST; host stays alive', async () => { assertError(await host.request('siphon.invalid'), 'BAD_REQUEST'); success(await host.request('hello', { extVersion: '1.0.0' })); });
   await report.test('listJobs shape', async () => { check(Array.isArray(success(await host.request('listJobs')).jobs), 'jobs must be an array'); });
+  await report.test('invalid download/analyze options are rejected without losing the connection', async () => {
+    for (const options of [{ format: 'invalid' }, { analyze: 'yes' }, { bpmRange: [180, 70] }, { outputDir: 'relative' }]) {
+      assertError(await host.request('download', { jobId: randomUUID(), url: 'https://example.com/audio', options }), 'BAD_REQUEST');
+    }
+    for (const request of [{}, { path: join(temp, 'a.wav'), url: 'https://example.com/a' }, { path: 'relative.wav' }, { path: join(temp, 'a.wav'), maxSeconds: true }]) {
+      assertError(await host.request('analyze', request), 'BAD_REQUEST');
+    }
+    success(await host.request('hello'));
+  });
   for (const [label, bytes] of [['invalid JSON', Buffer.from('{bad')], ['non-object JSON', Buffer.from('[]')], ['invalid UTF-8', Buffer.from([0xff])]]) {
     await report.test(`malformed frame: ${label} → BAD_REQUEST; process survives`, async () => {
       const h = launch(), after = h.messages.length; h.child.stdin.write(frame(bytes));
@@ -161,7 +198,7 @@ try {
     fixture = await localFixture();
     await report.test('unsupported HTML URL → UNSUPPORTED_URL', async () => assertError(await host.request('probe', { url: `${fixture.origin}/unsupported` }), 'UNSUPPORTED_URL'));
     const url = args.has('--live') ? MEDIA.youtube : `${fixture.origin}/media`;
-    for (const format of ['mp3', 'm4a', 'opus', 'flac', 'wav', 'best']) {
+    for (const format of ['mp3', 'm4a', 'opus', 'ogg', 'flac', 'wav', 'best']) {
       let id;
       await report.test(`${args.has('--live') ? 'live' : 'local'} download ${format}: codec, bitrate, duration, tags, artwork`, async () => {
         id = await start(host, url, opts(format, join(temp, format)));
@@ -185,6 +222,50 @@ try {
       const id = await start(host, `${fixture.origin}/mono`, opts('opus', join(temp, 'mono-opus')));
       const done = await terminal(host, id); check(done.state === 'done', JSON.stringify(done.error));
       return JSON.stringify(await inspect(done.file, 'opus'));
+    });
+    await report.test('conversion preserves dotted filename stems', async () => {
+      const id = await start(host, `${fixture.origin}/media`, opts('wav', join(temp, 'dotted'), { filenameTemplate: 'Artist.v1.track.%(ext)s', analyze: false }));
+      const done = await terminal(host, id);
+      check(done.state === 'done', JSON.stringify(done.error));
+      check(basename(done.file) === 'Artist.v1.track.wav', `Dotted stem changed: ${done.file}`);
+      check(existsSync(done.file), 'Reported output is missing');
+    });
+    if (args.has('--rust') && !args.has('--installed')) await report.test('diagnostic driver waits for deferred analysis and exits cleanly', async () => {
+      const dir = join(temp, 'driver');
+      await command(process.execPath, [resolve(ROOT, 'helper/tools/drive.mjs'), rustBinary, `${fixture.origin}/media`, dir, JSON.stringify(opts('wav', dir))]);
+      const outputs = (await files(dir)).filter(path => path.endsWith('.wav'));
+      check(outputs.length === 1 && basename(outputs[0]).includes(' BPM '), `Missing analyzed driver output: ${JSON.stringify(outputs)}`);
+    });
+    await report.test('local analyze is read-only and leaves the protocol responsive', async () => {
+      const path = join(temp, 'source.mp4'), before = await readFile(path);
+      const analyzing = host.request('analyze', { path, maxSeconds: 8 });
+      const at = performance.now();
+      success(await host.request('listJobs', {}, 2000));
+      check(performance.now() - at < 1500, 'Analysis blocked the protocol reader');
+      const data = success(await analyzing);
+      check(data.source === 'file' && typeof data.analysis?.bpm === 'number' && typeof data.analysis?.keyShort === 'string', `Invalid analysis: ${JSON.stringify(data)}`);
+      check(before.equals(await readFile(path)), 'Read-only analysis modified the source');
+    });
+    await report.test('protocol v1 deferred analysis: ordered events, renamed files, pending drained', async () => {
+      const deferred = launch();
+      try {
+        const hello = success(await deferred.request('hello', { protocolVersion: 1 }));
+        check(hello.protocolVersion >= 1, 'Deferred analysis contract unavailable');
+        const id = await start(deferred, `${fixture.origin}/media`, opts('wav', join(temp, 'deferred'), { filenameTemplate: 'Artist.v1.track.%(ext)s', analyze: true, appendBpmKey: true }));
+        const done = await terminal(deferred, id);
+        check(done.state === 'done', JSON.stringify(done.error));
+        if (done.analysisPending > 0) await deferred.wait(m => m.type === 'analysis' && m.jobId === id && m.pending === 0, 120000);
+        const events = deferred.messages.filter(m => m.jobId === id);
+        const analysis = events.filter(m => m.type === 'analysis').at(-1);
+        check(analysis && analysis.analysis && !analysis.analysisError && analysis.pending === 0, `Analysis failed: ${JSON.stringify(analysis)}`);
+        check(analysis.files.includes(analysis.file) && existsSync(analysis.file), 'Analysis did not report an existing renamed output');
+        check(basename(analysis.file).startsWith('Artist.v1.track ['), `Unexpected analyzed filename: ${analysis.file}`);
+        const accepted = deferred.messages.findIndex(m => m.type === 'result' && m.data?.jobId === id);
+        check(accepted >= 0 && accepted < deferred.messages.findIndex(m => m.type === 'job' && m.jobId === id), 'Job event preceded acceptance');
+        const terminalIndex = events.findIndex(m => m.type === 'job' && TERMINAL.has(m.state));
+        check(!events.slice(terminalIndex + 1).some(m => m.type === 'job'), 'A stale job event followed the terminal event');
+        if (analysis.receivedMs <= done.receivedMs) check(done.files.includes(analysis.file), 'Terminal event reverted a completed analysis rename');
+      } finally { await deferred.close(); }
     });
     await report.test('cancel while downloading; listJobs active; no .part files', async () => {
       const dir = join(temp, 'cancel'), id = await start(host, `${fixture.origin}/slow.wav`, opts('best', dir, { trim: null, rateLimit: '32K', embedThumbnail: false }));
@@ -223,5 +304,5 @@ finally {
   for (const h of hosts) await h.close();
   if (fixture) { fixture.server.closeAllConnections(); await new Promise(r => fixture.server.close(r)); }
   await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
-  await report.finish({ installed: args.has('--installed'), live: args.has('--live'), generatedFixture: Boolean(fixture), cleanedTemporaryOutput: !existsSync(temp) });
+  await report.finish({ installed: args.has('--installed'), binary: args.has('--rust') && !args.has('--installed') ? rustBinary : undefined, registeredManifest, live: args.has('--live'), generatedFixture: Boolean(fixture), cleanedTemporaryOutput: !existsSync(temp) });
 }

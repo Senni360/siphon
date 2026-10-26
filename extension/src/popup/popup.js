@@ -1,3 +1,4 @@
+import { stemControls, renderActiveStems } from './stems-ui.js';
 import { CMD, EVT, TERMINAL_STATES, send } from '../shared/protocol.js';
 import { getSettings, mergeSettings, toDownloadOptions } from '../shared/settings.js';
 import { formatDuration, formatSpeed, formatEta, formatPercent, parseTime } from '../shared/ui/format.js';
@@ -59,7 +60,7 @@ function saveSetting(patch) {
 function renderHost(host) {
   const wasReady = state.host.state === 'ready', hadTray = !!state.host.dropzone;
   state.host = host || { state: 'connecting' };
-  if (hadTray !== !!state.host.dropzone && state.history) renderHistory(state.history);
+  if (state.history) renderHistory(state.history);
   const names = { ready: 'Engine ready', connecting: 'Connecting', missing: 'Setup needed', error: 'Engine error' };
   const node = $('host-status'); node.dataset.state = state.host.state;
   node.querySelector('span').textContent = names[state.host.state] || 'Connecting';
@@ -168,8 +169,12 @@ function renderJobs(jobs = []) {
 }
 function renderHistory(history = []) {
   state.history = history;
-  const focusedKey = document.activeElement?.closest('#recent button')?.dataset.key;
-  if (!history.length) { $('recent').replaceChildren(el('p', 'empty-recent', 'Downloads land here, ready to drag into your DAW.')); return; }
+  const focusedKey = document.activeElement?.dataset.key;
+  const refreshActive = () => {
+    renderActiveStems($('active-stems'), state, text => message(text), $('recent'));
+    if (focusedKey) ([...document.querySelectorAll('[data-key]')].find(control => control.dataset.key === focusedKey) || document.querySelector('[data-options="history"]'))?.focus({ preventScroll: true });
+  };
+  if (!history.length) { $('recent').replaceChildren(el('p', 'empty-recent', 'Downloads land here, ready to drag into your DAW.')); refreshActive(); return; }
   $('recent').replaceChildren();
   for (const item of history.slice(0, 6)) {
     const failed = item.state === 'error', cancelled = item.state === 'cancelled';
@@ -189,6 +194,7 @@ function renderHistory(history = []) {
       if (bpm || key) meta.append(el('span', 'reading', [bpm && `${bpm} BPM`, key].filter(Boolean).join(' · ')));
     }
     copy.append(title, meta);
+    if (item.state === 'done' && (item.file || item.files?.length)) copy.append(stemControls(item, state, text => message(text), () => renderHistory(state.history)));
     if (failed) copy.append(el('p', 'history-error', errorText(item.error)));
     const actions = el('div', 'history-actions');
     if (failed || cancelled) actions.append(actionButton(`Retry ${item.title || 'download'}`, 'retry', () => send(CMD.RETRY, { jobId: item.id || item.jobId }), `retry-${item.id}`));
@@ -198,7 +204,7 @@ function renderHistory(history = []) {
     }
     row.append(thumb, copy, actions); $('recent').append(row);
   }
-  if (focusedKey) ([...$('recent').querySelectorAll('button')].find(button => button.dataset.key === focusedKey) || document.querySelector('[data-options="history"]')).focus({ preventScroll: true });
+  refreshActive();
 }
 function renderAnalysis() {
   const target = $('tab-analysis');
@@ -270,6 +276,7 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.altKey && (event.target === document.body || event.target === document.documentElement)) { event.preventDefault(); download(); }
 });
 chrome.runtime.onMessage.addListener(event => {
+  if (event.evt === EVT.STEMS) { state.stems = event.stems; renderHistory(state.history); }
   if (event.evt === EVT.JOBS) renderJobs(event.jobs);
   if (event.evt === EVT.HISTORY) renderHistory(event.history);
   if (event.evt === EVT.HOST) renderHost(event.status);
@@ -283,6 +290,7 @@ async function init() {
   const probing = probeTab();
   try {
     const initial = await send(CMD.GET_STATE);
+    state.stems = initial?.stems || [];
     renderSettings(initial?.settings); renderHost(initial?.host); renderJobs(initial?.jobs); renderHistory(initial?.history);
     if (state.settings.playlist === 'all') document.querySelector('[data-playlist="all"]').click();
   } catch (error) { renderHost({ state: 'error', error }); message(errorText(error)); }

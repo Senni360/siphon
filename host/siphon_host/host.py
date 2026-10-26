@@ -10,7 +10,7 @@ import subprocess
 import sys
 import threading
 
-from . import __version__
+from . import PROTOCOL_VERSION, __version__
 from .analysis_service import warm_up, shutdown as shutdown_analysis
 from .analyze_request import analyze_request
 from .downloader import create_downloader
@@ -61,7 +61,10 @@ class Host:
             if kind == "hello":
                 if "maxConcurrent" in request:
                     self.jobs.resize(request["maxConcurrent"])
-                self.result(request, {"hostVersion": __version__, "ytdlpVersion": package_version("yt-dlp"),
+                client = request.get("protocolVersion")
+                client = client if isinstance(client, int) and not isinstance(client, bool) else 0
+                self.jobs.defer_analysis = client >= 1
+                self.result(request, {"hostVersion": __version__, "protocolVersion": PROTOCOL_VERSION, "ytdlpVersion": package_version("yt-dlp"),
                                       "ffmpeg": self.ffmpeg, "jsRuntime": {k: v for k, v in self.node.items() if k != "path"} if self.node else None,
                                       "defaultOutputDir": default_output_dir(), "platform": sys.platform,
                                       "dropzone": find_spec("PySide6") is not None})
@@ -182,7 +185,11 @@ class Host:
             files = [str(path) for value in item["files"] if (path := self._path(value)).is_file()]
             if not files:
                 raise HostError("DISK", "The selected file no longer exists.")
-            clean.append({"files": files, **{key: item[key][:300] for key in ("title", "subtitle", "service") if isinstance(item.get(key), str)}})
+            entry = {"files": files, **{key: item[key][:300] for key in ("title", "subtitle", "service") if isinstance(item.get(key), str)}}
+            if isinstance(item.get("replaces"), list) and 1 <= len(item["replaces"]) <= 500:
+                # Earlier paths of a visible card (renamed by late analysis); they need not exist.
+                entry["replaces"] = [str(self._path(value)) for value in item["replaces"]]
+            clean.append(entry)
         self._tray({"items": clean, "pinned": bool(request.get("pinned")), "ffmpeg": self.ffmpeg.get("path")})
         return {"shown": len(clean)}
 

@@ -22,7 +22,7 @@ export async function resolveTab(chrome, { tabId, playlist = 'single' } = {}) {
   return { url, title };
 }
 
-export function createRouter({ chrome, ready, native, jobs, getSettings, setSettings, analysisCache = new AnalysisCache(chrome) }) {
+export function createRouter({ chrome, ready, native, jobs, stems, getSettings, setSettings, analysisCache = new AnalysisCache(chrome) }) {
   const cacheReady = analysisCache.init();
   const analyzing = new Map();
   async function analyzeUrl(value) {
@@ -57,7 +57,10 @@ export function createRouter({ chrome, ready, native, jobs, getSettings, setSett
     switch (cmd) {
       case CMD.GET_STATE:
         await native.connect().catch(() => {});
-        return { host: native.status, jobs: jobs.list(), history: jobs.history, settings: await getSettings() };
+        return { host: native.status, jobs: jobs.list(), history: jobs.history, stems: stems?.list() || [], settings: await getSettings() };
+      case CMD.SPLIT_STEMS: return stems.split(message.id, message.path);
+      case CMD.CANCEL_STEMS: return stems.cancel(message.jobId);
+      case CMD.SHOW_STEMS: return stems.show(message.jobId);
       case CMD.GET_SETTINGS: return getSettings();
       case CMD.ANALYZE: return analyzeUrl(message.url);
       case CMD.ANALYZE_TAB: return analyzeUrl((await resolveTab(chrome, {tabId:message.tabId})).url);

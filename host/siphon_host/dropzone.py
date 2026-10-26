@@ -221,6 +221,17 @@ class Tray(QWidget):
             files = [f for f in item.get("files") or [] if isinstance(f, str) and Path(f).is_file()]
             if not files:
                 continue
+            if item.get("replaces"):
+                # Late BPM/key for a card already on screen: refresh it quietly,
+                # and never bring back a card the user has dismissed.
+                replaced = [str(Path(f)) for f in item["replaces"]]
+                card = next((c for c in self.cards if c.files == replaced and not c.closing), None)
+                if card:
+                    card.files = [str(Path(f)) for f in files]
+                    card.title = item.get("title") or card.title
+                    card.subtitle = item.get("subtitle") or card.subtitle
+                    self.update()
+                continue
             existing = next((c for c in self.cards if c.files == [str(Path(f)) for f in files] and not c.closing), None)
             if existing:
                 # Re-summoning a visible card refreshes it with a small pulse.

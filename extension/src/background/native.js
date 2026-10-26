@@ -1,9 +1,9 @@
-import { HOST, HOST_NAME, EVT } from '../shared/protocol.js';
+import { HOST, HOST_NAME, EVT, PROTOCOL_VERSION } from '../shared/protocol.js';
 import { broadcast, errorData, failure, timer } from './common.js';
 
 export class NativeManager {
-  constructor(chrome, { getSettings, onJob = () => {}, onResync = () => {}, idleMs = 60_000, retryMs = 1000, timeoutMs = 15_000, probeTimeoutMs = 45_000, analyzeTimeoutMs = 150_000, updateTimeoutMs = 330_000, pickerTimeoutMs = 300_000 } = {}) {
-    Object.assign(this, { chrome, getSettings, onJob, onResync, idleMs, retryMs, timeoutMs, probeTimeoutMs, analyzeTimeoutMs, updateTimeoutMs, pickerTimeoutMs });
+  constructor(chrome, { getSettings, onJob = () => {}, onAnalysis = () => {}, onResync = () => {}, onStem = () => {}, onStemResync = () => {}, idleMs = 60_000, retryMs = 1000, timeoutMs = 15_000, probeTimeoutMs = 45_000, analyzeTimeoutMs = 150_000, updateTimeoutMs = 330_000, pickerTimeoutMs = 300_000 } = {}) {
+    Object.assign(this, { chrome, getSettings, onJob, onAnalysis, onResync, onStem, onStemResync, idleMs, retryMs, timeoutMs, probeTimeoutMs, analyzeTimeoutMs, updateTimeoutMs, pickerTimeoutMs });
     this.status = { state: 'connecting' };
     this.pending = new Map();
     this.activeJobs = 0;
@@ -57,12 +57,14 @@ export class NativeManager {
           if (this.port !== port) return;
           this.lost(message);
         });
-        const hello = await this.raw(HOST.HELLO, { extVersion: this.chrome.runtime.getManifest().version, maxConcurrent: settings.maxConcurrent });
+        const hello = await this.raw(HOST.HELLO, { extVersion: this.chrome.runtime.getManifest().version, protocolVersion: PROTOCOL_VERSION, maxConcurrent: settings.maxConcurrent });
         const snapshot = await this.raw(HOST.LIST_JOBS);
         this.attempt = 0;
         this.restartRequired = false;
         this.setStatus({ ...hello, state: 'ready' });
         await this.onResync(snapshot.jobs || []);
+        const stems = hello.stems === true ? await this.raw(HOST.LIST_STEMS) : { jobs: [] };
+        await this.onStemResync(stems.jobs || []);
         this.armIdle();
         return this.status;
       } catch (error) {
@@ -113,7 +115,7 @@ export class NativeManager {
     // Updating a queue limit must not replace the process running the downloads.
     if (this.connecting) await this.connecting;
     if (!this.port) return;
-    const hello = await this.raw(HOST.HELLO, { extVersion: this.chrome.runtime.getManifest().version, maxConcurrent: settings.maxConcurrent });
+    const hello = await this.raw(HOST.HELLO, { extVersion: this.chrome.runtime.getManifest().version, protocolVersion: PROTOCOL_VERSION, maxConcurrent: settings.maxConcurrent });
     this.setStatus({ ...this.status, ...hello });
   }
   async update() {
@@ -159,6 +161,10 @@ export class NativeManager {
       else request.reject(failure(message.error?.code || 'INTERNAL', message.error?.message || 'Native request failed.'));
     } else if (message.type === 'job' && message.jobId) {
       void Promise.resolve(this.onJob(message)).catch(error => console.error('Siphon job event:', error));
+    } else if (message.type === 'stem' && message.jobId) {
+      void Promise.resolve(this.onStem(message)).catch(error => console.error('Siphon stem event:', error));
+    } else if (message.type === 'analysis' && message.jobId) {
+      void Promise.resolve(this.onAnalysis(message)).catch(error => console.error('Siphon analysis event:', error));
     }
   }
 }

@@ -28,8 +28,22 @@ export class Notifications {
     await this.chrome.notifications.create(`siphon:${job.id}`, {
       type: 'basic', iconUrl: this.chrome.runtime.getURL('icons/icon-128.png'),
       title: job.title || (success ? 'Download complete' : 'Download failed'),
-      message: success ? [job.file?.split(/[\\/]/).pop() || 'Audio downloaded.', job.analysis && `${formatBpm(job.analysis.bpm)} BPM · ${job.analysis.key}`].filter(Boolean).join('\n') : friendlyError(job.error),
+      message: success ? completionMessage(job) : friendlyError(job.error),
       ...(success && job.file ? { buttons: [{ title: 'Show in folder' }, { title: 'Play' }] } : {}),
     });
   }
+  // BPM/key arrive after the completion toast or tray card; refresh whichever is showing.
+  async analysis(item, previous) {
+    if (item.state !== 'done') return;
+    const settings = await this.getSettings();
+    if (settings.dropOverlay && this.native.status?.dropzone && item.files?.length) {
+      const replaces = dropItem(previous).files;
+      if (replaces.length) await this.native.request(HOST.SHOW_DROP, { items: [{ ...dropItem(item, settings.keyNotation), replaces }] }).catch(() => {});
+    }
+    await this.chrome.notifications.update(`siphon:${item.id}`, { message: completionMessage(item) }).catch(() => {});
+  }
+}
+
+function completionMessage(job) {
+  return [job.file?.split(/[\\/]/).pop() || 'Audio downloaded.', job.analysis && `${formatBpm(job.analysis.bpm)} BPM · ${job.analysis.key}`].filter(Boolean).join('\n');
 }

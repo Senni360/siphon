@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Siphon — Audio Downloader",
   "short_name": "Siphon",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Download audio from YouTube, SoundCloud, Bandcamp and 1000+ sites instantly.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2oTPGpOy9BlQsLAprJOAdSlJrheqN9To10dLn87PlBxTDy1LmNeSJLiUG/L7ds2iAE2ZrwTCA2Ut0aFCwgfN9M+cpD8BHeBCgpT+pVGUAF2gQUjsyMN6P6mcaL57ueftBb+15S+2Y1gVu95geB7N5un2NP2BYbfliH6oApCPKUrSqz0n751K/SEdwvJC3t9BpOH2wzpMFdqDm6MyA6TwYkpDGJquTHwKcj81NI/7s/gsTKvhlrVDINb/FIIMA59OcAzZ6Ult77JSE/7z3E8ijreWdudQnV5BXJpHvfardYb8H9O9kq4eGtSkEyEcHe8wRSVzYCIi+ckrS2bqtUH2fwIDAQAB",
   "minimum_chrome_version": "120",
