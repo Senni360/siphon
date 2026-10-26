@@ -34,6 +34,6 @@ function Install-SiphonFfmpeg {
     }
     finally { if (Test-Path -LiteralPath $archive) { Remove-Item -LiteralPath $archive -Force } }
     $binary = Find-SiphonFfmpeg $installDirectory
-    if (-not $binary) { throw 'The portable ffmpeg download did not contain ffmpeg.exe. See docs/INSTALL.md.' }
+    if (-not $binary) { throw 'The portable ffmpeg download did not contain ffmpeg.exe. See the installation instructions in README.md.' }
     return $binary
 }

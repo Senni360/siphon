@@ -10,7 +10,7 @@ class AnalysisError(ValueError):
 
 
 def analyze_file(path, *, max_seconds=None, bpm_range=(70, 180)) -> dict:
-    """Decode local audio and return the JSON-compatible Analysis from SPEC.md.
+    """Decode local audio and return the JSON-compatible analysis result.
 
     None uses at most the middle 180 seconds. Numeric/scientific imports happen
     only on this call. Decode failures raise AnalysisError; invalid options raise

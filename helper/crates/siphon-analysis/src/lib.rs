@@ -30,7 +30,7 @@ pub struct BpmCandidate {
     pub score: f64,
 }
 
-/// The JSON-compatible Analysis from SPEC.md.
+/// The JSON-compatible analysis result.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Analysis {

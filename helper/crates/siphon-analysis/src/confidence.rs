@@ -1,4 +1,4 @@
-//! Conservative empirical confidence mapping; provenance in host/bench.
+//! Conservative empirical confidence mapping.
 //!
 //! Scores express exact BPM (within one beat/minute) and exact major/minor key,
 //! never octave-equivalent tempo or harmonically related key correctness.

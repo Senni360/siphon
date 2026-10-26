@@ -1,8 +1,8 @@
 // Shared contract between popup / options / content scripts and the service worker.
-// See SPEC.md. Additive changes only; note them in docs/CHANGELOG-SPEC.md.
+// Keep protocol changes backward compatible.
 
 export const HOST_NAME = 'com.siphon.host';
-// Native-messaging contract version, sent in `hello` both ways. See docs/CHANGELOG-SPEC.md.
+// Native-messaging contract version, sent in `hello` both ways.
 export const PROTOCOL_VERSION = 1;
 
 // Native host request types (browser -> host)

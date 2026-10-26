@@ -6,7 +6,7 @@ export const QUALITIES = ['320', '256', '192', '128', 'V0', 'best'];
 export const SITE_INTEGRATIONS = ['youtube', 'youtubeMusic', 'soundcloud', 'bandcamp'];
 
 export const DEFAULT_SETTINGS = Object.freeze({
-  // DownloadOptions defaults (see SPEC.md)
+  // DownloadOptions defaults
   format: 'mp3',
   quality: '320',
   outputDir: null,
