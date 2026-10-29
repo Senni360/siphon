@@ -62,6 +62,25 @@ test('SoundCloud list descriptors resolve a recycled item permalink at click tim
   permalink = '/artist/second';
   assert.equal(descriptor.resolve().url, 'https://soundcloud.com/artist/second');
 });
+test('SoundCloud rows join the inner toolbar button group, not the outer actions wrapper', () => {
+  // querySelector with a selector list matches in document order, so the outer wrapper used to win.
+  const link = node({ text: 'Track', attributes: { href: '/artist/song' } });
+  const buttons = node(), toolbar = node({ one: s => s === ':scope > .sc-button-group' ? buttons : null }), wrapper = node();
+  const item = node({ one: s => s.includes('a.soundTitle') ? link : s === '.sound__soundActions .soundActions' ? toolbar : s === '.sound__soundActions' ? wrapper : null });
+  const a = adapter('soundcloud', 'https://soundcloud.com/feed', doc(() => null, s => s === '.soundList__item, .trackList__item' ? [item] : []));
+  const descriptor = a.collect()[0];
+  assert.equal(descriptor.mount, buttons);
+  assert.equal(descriptor.slot, 'sc-row');
+  assert.equal(descriptor.icon, true);
+});
+test('SoundCloud player control sits beside the now-playing badge, not inside it', () => {
+  const elements = node(), title = node({ text: 'Now playing', attributes: { href: '/artist/song', title: 'Now playing' } });
+  const badge = { ...node(), closest: s => s === '.playControls__elements' ? elements : null };
+  const a = adapter('soundcloud', 'https://soundcloud.com/feed', doc(s => s === '.playControls .playbackSoundBadge' ? badge : s === '.playbackSoundBadge__titleLink' ? title : null));
+  const descriptor = a.collect().find(d => d.key === 'player');
+  assert.equal(descriptor.mount, elements);
+  assert.equal(descriptor.slot, 'sc-bar');
+});
 test('Bandcamp album descriptors download all audio; track descriptors stay single', () => {
   for (const type of ['album', 'track']) {
     const a = adapter('bandcamp', `https://artist.bandcamp.com/${type}/release`, doc(s => s === '#name-section' ? node() : null));
@@ -82,12 +101,13 @@ test('YouTube mounts beside Subscribe before the clipped like/share toolbar', ()
   assert.equal(a.collect()[0].mount, owner);
 });
 test('YouTube 2026 Shorts uses the visible reel action-bar view model without is-active', () => {
-  const mount = node(), title = node({ text: 'Current short' });
+  const pivot = node(), mount = node({ one: s => s === ':scope > pivot-button-view-model' ? pivot : null }), title = node({ text: 'Current short' });
   const reel = node({ one: s => s.includes('reel-action-bar-view-model') ? mount : title });
   reel.getBoundingClientRect = () => ({ top: 64 });
   const a = adapter('youtube', 'https://www.youtube.com/shorts/DZpSvIkDH-c', doc(() => null, () => [reel]));
   assert.equal(a.collect()[0].mount, mount);
   assert.equal(a.collect()[0].compact, true);
+  assert.equal(a.collect()[0].before, pivot, 'the sound pivot stays last in the column');
   assert.equal(a.current().title, 'Current short');
   assert.equal(a.current().url, 'https://www.youtube.com/watch?v=DZpSvIkDH-c');
 });

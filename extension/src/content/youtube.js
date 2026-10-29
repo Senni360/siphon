@@ -16,12 +16,14 @@
       if (location.pathname === '/watch') {
         // Beside Subscribe: the like/share row is a clipped scroller that hides appended buttons.
         const mount = document.querySelector('ytd-watch-metadata #owner') || document.querySelector('ytd-watch-metadata #top-level-buttons-computed') || document.querySelector('ytd-watch-metadata #actions-inner') || document.querySelector('ytd-watch-metadata #actions') || document.querySelector('ytd-watch-flexy #menu #top-level-buttons-computed');
-        return mount ? [{ mount, key: 'watch', resolve: current }] : [];
+        return mount ? [{ mount, key: 'watch', resolve: current, slot: 'yt' }] : [];
       }
       if (location.pathname.startsWith('/shorts/')) {
         const reel = activeReel();
         const mount = reel?.querySelector('reel-action-bar-view-model') || reel?.querySelector('#actions, .actions, .ytReelPlayerOverlayViewModelActionsContainer') || document.querySelector('ytd-shorts #actions');
-        return mount ? [{ mount, key: 'short', resolve: current, compact: true }] : [];
+        // Native order ends with the sound pivot; keep it last, as it is in every other Short.
+        const before = mount?.querySelector(':scope > pivot-button-view-model');
+        return mount ? [{ mount, key: 'short', resolve: current, compact: true, before }] : [];
       }
       return [];
     },

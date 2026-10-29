@@ -11,7 +11,7 @@
       if (!current()) return [];
       const mount = document.querySelector('#name-section') || document.querySelector('#trackInfoInner .inline_player') || document.querySelector('#trackInfoInner');
       const album = location.pathname.startsWith('/album/');
-      return mount ? [{ mount, key: 'release', resolve: current, ...(album ? { label: 'Download album audio', playlist: true } : {}) }] : [];
+      return mount ? [{ mount, key: 'release', resolve: current, slot: 'bc', ...(album ? { label: 'Download album audio', playlist: true } : {}) }] : [];
     },
   });
 })();

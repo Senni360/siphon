@@ -29,10 +29,12 @@
     collect() {
       const result = [], player = document.querySelector('ytmusic-player-bar');
       const mount = player?.querySelector('.middle-controls-buttons') || player?.querySelector('.middle-controls, .right-controls');
-      if (mount) result.push({ mount, key: 'player', resolve: current });
+      if (mount) result.push({ mount, key: 'player', resolve: current, slot: 'ytm' });
       if (/^\/(?:playlist|browse)/.test(location.pathname) && playlist()) {
-        const header = document.querySelector('ytmusic-responsive-header-renderer .buttons, ytmusic-detail-header-renderer #buttons, ytmusic-detail-header-renderer .buttons, ytmusic-responsive-header-renderer #buttons') || document.querySelector('ytmusic-detail-header-renderer, ytmusic-responsive-header-renderer');
-        if (header) result.push({ mount: header, key: 'playlist', resolve: playlist, label: 'Download all', playlist: true });
+        const buttons = document.querySelector('ytmusic-responsive-header-renderer .buttons, ytmusic-detail-header-renderer #buttons, ytmusic-detail-header-renderer .buttons, ytmusic-responsive-header-renderer #buttons');
+        // The current header centres a row too narrow to share; sit centred beneath it instead.
+        const header = buttons || document.querySelector('ytmusic-detail-header-renderer, ytmusic-responsive-header-renderer');
+        if (header) result.push({ mount: header, key: 'playlist', resolve: playlist, label: 'Download all', playlist: true, ...(buttons ? {} : { slot: 'ytm-header' }) });
       }
       return result;
     },

@@ -7,19 +7,33 @@
   const DONE = 'm5 12.5 4.5 4.5L19 7';
   const CHEVRON = 'm7 10 5 5 5-5';
   const ANALYZE = 'M4 10v4m4-7v10m4-13v16m4-13v10m4-7v4';
+  // Host-level layout is !important: page rules otherwise beat :host and zero our spacing.
+  // data-slot tunes the silhouette to the toolbar the control sits in.
   const CSS = `
-    :host{--acc:#f4f4f5;--glass:rgb(255 255 255/.1);--glass-hover:rgb(255 255 255/.16);--line:rgb(255 255 255/.12);--spec:rgb(255 255 255/.1);--fg:#f4f4f5;--fg2:#a1a1aa;--pop:rgb(28 28 32/.82);--h:36px;--r:18px;display:inline-flex;vertical-align:middle;flex-shrink:0;margin:0 0 0 8px;position:relative;font-family:"Siphon Geist",system-ui,sans-serif;color-scheme:dark;letter-spacing:-.005em}
-    :host([data-light=true]){--glass:rgb(0 0 0/.05);--glass-hover:rgb(0 0 0/.09);--line:rgb(0 0 0/.07);--spec:rgb(255 255 255/.8);--fg:#0f0f0f;--fg2:#5c5c66;--pop:rgb(255 255 255/.86);color-scheme:light}
+    :host{--acc:#f4f4f5;--glass:rgb(255 255 255/.1);--glass-hover:rgb(255 255 255/.2);--line:rgb(255 255 255/.12);--spec:rgb(255 255 255/.1);--fg:#f4f4f5;--fg2:#a1a1aa;--pop:rgb(28 28 32/.82);--h:36px;--r:18px;display:inline-flex!important;vertical-align:middle;flex-shrink:0!important;align-self:center!important;margin:0 0 0 8px!important;position:relative!important;font-family:"Siphon Geist",system-ui,sans-serif;color-scheme:dark;letter-spacing:-.005em}
+    :host([data-light=true]){--glass:rgb(0 0 0/.05);--glass-hover:rgb(0 0 0/.1);--line:rgb(0 0 0/.07);--spec:rgb(255 255 255/.8);--fg:#0f0f0f;--fg2:#5c5c66;--pop:rgb(255 255 255/.86);color-scheme:light}
     :host([data-site=youtube]),:host([data-site=youtubeMusic]){--acc:#ff0033}
-    :host([data-site=soundcloud]){--acc:#ff5500;--h:26px;--r:4px}
+    :host([data-slot=yt]){--h:40px;--r:20px}
+    :host([data-slot=ytm]){margin:0!important}
+    :host([data-slot=ytm-header]){display:flex!important;width:max-content;margin:12px auto 0!important}
+    :host([data-site=soundcloud]){--acc:#ff5500;--h:32px;--r:4px}
+    :host([data-slot=sc]),:host([data-slot=sc-row]){margin:0!important;vertical-align:top}
+    :host([data-slot=sc-wrap]){display:flex!important;width:max-content;margin:8px 0 0!important}
+    :host([data-slot=sc-bar]){--h:28px}
     :host([data-site=bandcamp]){--acc:#1da0c3;--h:26px;--r:4px}
+    :host([data-slot=bc]){display:flex!important;width:max-content;margin:10px 0 0!important}
     *{box-sizing:border-box}
-    .group{position:relative;display:inline-flex;align-items:stretch;height:var(--h);border-radius:var(--r);background:var(--glass);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line),inset 0 1px 0 var(--spec);backdrop-filter:blur(16px) saturate(1.4);overflow:hidden;transition:background .14s}
+    .group{position:relative;display:inline-flex;align-items:stretch;height:var(--h);border-radius:var(--r);background:var(--native,var(--glass));color:var(--fg);box-shadow:inset 0 0 0 1px var(--line),inset 0 1px 0 var(--spec);backdrop-filter:blur(16px) saturate(1.4);overflow:hidden;transition:background .14s}
+    :host([data-site=soundcloud]) .group{box-shadow:none;backdrop-filter:none}
     button{font:520 14px/1 "Siphon Geist",system-ui,sans-serif;letter-spacing:inherit;color:inherit;background:none;border:0;cursor:pointer;height:100%;padding:0 12px 0 10px;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;transition:background .14s}
-    :host([data-site=soundcloud]) button,:host([data-site=bandcamp]) button{font-size:12px;padding:0 9px 0 7px;gap:5px}
+    :host([data-site=soundcloud]) button{font-weight:600;padding:0 12px;gap:8px}
+    :host([data-site=bandcamp]) button{font-size:12px;padding:0 9px 0 7px;gap:5px}
     button:hover:not(:disabled){background:var(--glass-hover)}button:focus-visible{outline:2px solid var(--acc);outline-offset:-2px}button:disabled{cursor:default}
     .main svg{width:18px;height:18px;stroke:var(--acc);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;transition:transform .3s cubic-bezier(.34,1.4,.5,1)}
-    :host([data-site=soundcloud]) .main svg,:host([data-site=bandcamp]) .main svg{width:15px;height:15px}
+    :host([data-site=soundcloud]) .main svg{width:16px;height:16px}
+    :host([data-site=bandcamp]) .main svg{width:15px;height:15px}
+    .label:empty{display:none}
+    :host([data-slot=sc-row]) .analysis-summary,:host([data-slot=sc-wrap]) .analysis-summary,:host([data-slot=sc-bar]) :is(.more,.analyze,.analysis-summary){display:none}
     .main:active:not(:disabled) svg{transform:translateY(1px) scale(.94)}
     button.more{width:var(--h);padding:0;flex-shrink:0;border-left:1px solid var(--line)}.more svg{width:14px;height:14px;stroke:var(--fg2);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
     button.analyze{width:var(--h);padding:0;flex-shrink:0;border-left:1px solid var(--line)}
@@ -47,7 +61,7 @@
     .analysis-heading{font-size:11px;color:var(--fg2);font-weight:520}
     .analysis-result{font-family:"Siphon Geist Mono",ui-monospace,monospace;font-size:16px;font-variant-numeric:tabular-nums}
     .analysis-note{font-size:11px;color:var(--fg2)}
-    :host([data-compact=true]){display:flex;margin:6px auto;--h:auto;--r:24px}:host([data-compact=true]) .group{flex-direction:column;width:48px}
+    :host([data-compact=true]){display:flex!important;margin:0 auto 16px!important;--h:auto;--r:24px}:host([data-compact=true]) .group{flex-direction:column;width:48px}
     :host([data-compact=true]) .main{padding:12px 0 8px;flex-direction:column;gap:4px}
     :host([data-compact=true]) .label{display:none}:host([data-compact=true]) button.more{width:48px;height:48px;border-left:0;border-top:1px solid var(--line)}
     :host([data-compact=true]) button.analyze{width:48px;height:48px;border-left:0;border-top:1px solid var(--line)}
@@ -152,7 +166,9 @@
       const labels = { queued: 'Queued', probing: 'Preparing', downloading: progress, converting: 'Converting', tagging: 'Tagging', analyzing: 'Analyzing', done: 'Saved', error: 'Retry', cancelled: 'Retry' };
       const status = labels[state] || r.descriptor.label || 'Siphon';
       r.host.dataset.state = state || 'idle';
-      r.label.textContent = r.descriptor.compact && state ? ({ probing: '…', converting: '…', tagging: '…', analyzing: '…', done: '' }[state] ?? status) : status;
+      // Icon-only controls show text only for progress and retry; the glyph and bar carry the rest.
+      const brief = r.descriptor.icon ? { idle: '', queued: '', probing: '', converting: '', tagging: '', analyzing: '', done: '' } : r.descriptor.compact ? { probing: '…', converting: '…', tagging: '…', analyzing: '…', done: '' } : {};
+      r.label.textContent = brief[state || 'idle'] ?? status;
       r.glyph.setAttribute('d', state === 'done' ? DONE : GLYPH);
       const fraction = state === 'downloading' && Number.isFinite(job?.progress) ? job.progress * .85 : { queued: .04, probing: .08, converting: .9, tagging: .94, analyzing: .97 }[state] ?? 0;
       r.group.style.setProperty('--p', String(Math.max(0, Math.min(1, fraction))));
@@ -191,6 +207,7 @@
     }
     function create(descriptor, media) {
       const host = element('span'); host.dataset.siphon = descriptor.key; host.dataset.site = adapter.site; host.dataset.compact = String(Boolean(descriptor.compact));
+      if (descriptor.slot) host.dataset.slot = descriptor.slot;
       const shadow = host.attachShadow({ mode: 'open' }), style = element('style', CSS), group = element('span'); group.className = 'group';
       const main = element('button'), more = element('button'), analyzer = element('button'), label = element('span'), progress = element('span');
       analyzer.type = 'button'; analyzer.className = 'analyze'; analyzer.append(svgIcon(ANALYZE));
@@ -226,7 +243,20 @@
       more.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); showMenu(r); });
       analyzer.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); void analyze(r); });
       shadow.addEventListener('keydown', e => { if (e.key === 'Escape' && openAnalysis === r) { e.preventDefault(); e.stopPropagation(); closeAnalysis(true); } });
-      group.append(main, more, analyzer, analysisSummary, progress); shadow.append(style, group, menu, analysisPanel); descriptor.mount.append(host); render(r); renderAnalysis(r); return r;
+      group.append(main, more, analyzer, analysisSummary, progress); shadow.append(style, group, menu, analysisPanel); place(r); render(r); renderAnalysis(r); return r;
+    }
+    // Optional `before` keeps a native anchor (e.g. the Shorts sound pivot) at the end of its column.
+    function place(r) {
+      const { mount, before } = r.descriptor;
+      if (before?.parentNode === mount) { if (r.host.nextSibling !== before) mount.insertBefore(r.host, before); }
+      else if (r.host.parentNode !== mount) mount.append(r.host);
+    }
+    // Borrow a neutral native button's fill so the control reads as part of the host toolbar.
+    function tone(r) {
+      const sample = r.descriptor.sample;
+      if (!sample?.isConnected || sample.matches(':hover, :active')) return;
+      const fill = getComputedStyle(sample).backgroundColor, alpha = fill.match(/[\d.]+/g)?.[3];
+      if (alpha === undefined || Number(alpha) > 0) r.host.style.setProperty('--native', fill); else r.host.style.removeProperty('--native');
     }
     function remove(r) { if (openMenu === r) closeMenu(); if (openAnalysis === r) closeAnalysis(); r.analysisToken = (r.analysisToken || 0) + 1; r.host.remove(); records.delete(r.host); }
     function scan() {
@@ -241,8 +271,8 @@
         const media = d.resolve(); if (!media?.url) continue;
         let r = [...records.values()].find(r => r.host.parentElement === d.mount && r.descriptor.key === d.key);
         if (!r) { r = create(d, media); records.set(r.host, r); }
-        else { r.descriptor = d; if (r.media?.url !== media.url) { r.media = media; r.jobId = null; render(r); resetAnalysis(r); } else r.media = media; renderAnalysis(r); }
-        r.host.dataset.light = String(!(adapter.dark?.() ?? pageIsDark())); desired.add(r.host);
+        else { r.descriptor = d; place(r); if (r.media?.url !== media.url) { r.media = media; r.jobId = null; render(r); resetAnalysis(r); } else r.media = media; renderAnalysis(r); }
+        r.host.dataset.light = String(!(adapter.dark?.() ?? pageIsDark())); tone(r); desired.add(r.host);
       }
       for (const r of [...records.values()]) if (!desired.has(r.host)) remove(r);
     }
@@ -256,7 +286,8 @@
     observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['href', 'src', 'video-id', 'hidden', 'is-active', 'dark'] });
     for (const event of ['yt-navigate-finish', 'yt-page-data-updated', 'ytmusic-player-page-changed', 'popstate', 'hashchange']) window.addEventListener(event, schedule);
     document.addEventListener('pointerdown', e => { if (openMenu && !e.composedPath().includes(openMenu.host)) closeMenu(); if (openAnalysis && !e.composedPath().includes(openAnalysis.host)) closeAnalysis(); }, true);
-    window.addEventListener('resize', () => { closeMenu(); closeAnalysis(); }); window.addEventListener('scroll', () => { closeMenu(); closeAnalysis(); }, { passive: true });
+    // Responsive hosts re-lay out on resize without DOM mutations; rescan so slots can adapt.
+    window.addEventListener('resize', () => { closeMenu(); closeAnalysis(); schedule(); }); window.addEventListener('scroll', () => { closeMenu(); closeAnalysis(); }, { passive: true });
     chrome.runtime.onMessage.addListener((message, sender, respond) => {
       if (message?.q === 'siphon:getMedia') { respond(adapter.current() || null); return false; }
       if (message?.evt === 'jobs' && Array.isArray(message.jobs)) {
